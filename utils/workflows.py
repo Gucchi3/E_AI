@@ -22,7 +22,7 @@ def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
     device = select_device(config.run.device)
-    model  = build_model(config.model.name, config.model.num_classes).to(device)
+    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding).to(device)
     if config.model.load_weight:
         weight_path = load_model_weight(model, device, config.model.weight_path)
         print_weight_loaded(weight_path)
@@ -46,6 +46,7 @@ def run_train(config: AppConfig) -> None:
         "macs": macs,
         "image_size": config.data.image_size,
         "normalization": config.data.normalization,
+        "quantization": asdict(config.quantization) if config.model.name == "qat_cifar_cnn" else None,
     }
     artifacts.save_json("training_info.json", training_info)
     print_training_info(config, model, device, artifacts.run_dir, macs)

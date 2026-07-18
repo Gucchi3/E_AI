@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32の学習・評価・重み保存だけを扱い、量子化、Observer、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。Observer、freeze/unfreeze、FP4、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -14,7 +14,8 @@ E_AI/
 ├── config.json             # 学習設定
 ├── model/
 │   ├── __init__.py         # 明示的なmodel factory
-│   └── cnn.py              # TinyCifarCNN
+│   ├── cnn.py              # TinyCifarCNN
+│   └── qat_cnn.py          # TinyQATCNN
 └── utils/
     ├── artifacts.py        # 実行結果、曲線、重みの保存
     ├── config.py           # JSON読込、型変換、検証
@@ -22,12 +23,13 @@ E_AI/
     ├── display.py          # Q_ViT準拠のRich表示
     ├── engine.py           # 1 epochのtrainとevaluate
     ├── profiling.py        # MACsの計測
+    ├── quantization/       # 単独でコピーできる整数QAT部品
     ├── runtime.py          # seedとdeviceの選択
     ├── weights.py          # 学習済み重みの読込
     └── workflows.py        # 学習全体の組み立て
 ```
 
-`model/`は`utils/`をimportしません。`utils/engine.py`は任意の`nn.Module`を受け取り、モデル名や保存先を知りません。`utils/workflows.py`だけがmodel、data、engine、artifactを組み合わせます。
+`utils/quantization/`はPyTorchと同じフォルダ内のmodule以外をimportしません。`model/qat_cnn.py`だけが公開APIの`utils.quantization`を利用します。`utils/engine.py`は任意の`nn.Module`を受け取り、モデル名や保存先を知りません。`utils/workflows.py`だけがmodel、data、engine、artifactを組み合わせます。
 
 ## 表示の契約
 

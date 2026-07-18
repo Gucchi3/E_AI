@@ -9,12 +9,12 @@
     "dataset"      : "cifar10",
     "root"         : "data",
     "image_size"   : 32,
-    "normalization": "cifar10",
+    "normalization": "zero_one",
     "batch_size"   : 128,
     "num_workers"  : 0
   },
   "model": {
-    "name"        : "cifar_cnn",
+    "name"        : "qat_cifar_cnn",
     "num_classes" : 10,
     "load_weight" : false,
     "weight_path" : ""

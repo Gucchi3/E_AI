@@ -44,6 +44,17 @@ class ModelConfig:
 
 
 @dataclass(frozen=True)
+class QuantizationConfig:
+    """整数QATの設定。"""
+
+    weight_bits    : int
+    activation_bits: int
+    input_bits     : int
+    rounding       : str
+
+
+
+@dataclass(frozen=True)
 class TrainConfig:
     """学習条件の設定。"""
 
@@ -58,10 +69,11 @@ class TrainConfig:
 class AppConfig:
     """E_AIの全設定。"""
 
-    run  : RunConfig
-    data : DataConfig
-    model: ModelConfig
-    train: TrainConfig
+    run         : RunConfig
+    data        : DataConfig
+    model       : ModelConfig
+    quantization: QuantizationConfig
+    train       : TrainConfig
 
 
 def load_config(path: str | Path) -> AppConfig:
@@ -80,13 +92,15 @@ def load_config(path: str | Path) -> AppConfig:
     run_raw   = _section(raw, "run")
     data_raw  = _section(raw, "data")
     model_raw = _section(raw, "model")
+    quant_raw = _optional_section(raw, "quantization", {"weight_bits": 8, "activation_bits": 8, "input_bits": 8, "rounding": "ties_away_from_zero"})
     train_raw = _section(raw, "train")
 
-    run_config   = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
-    data_config  = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
-    model_config = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
-    train_config = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
-    config       = AppConfig(run=run_config, data=data_config, model=model_config, train=train_config)
+    run_config          = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
+    data_config         = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
+    model_config        = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
+    quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), rounding=_string(quant_raw, "rounding"))
+    train_config        = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
+    config              = AppConfig(run=run_config, data=data_config, model=model_config, quantization=quantization_config, train=train_config)
     _validate(config)
 
     return config
@@ -95,6 +109,14 @@ def load_config(path: str | Path) -> AppConfig:
 def _section(raw: dict[str, Any], name: str) -> dict[str, Any]:
     """設定のsectionを取り出す。"""
     value = raw.get(name)
+    if not isinstance(value, dict):
+        raise ValueError(f"Config section {name!r} must be an object.")
+    return value
+
+
+def _optional_section(raw: dict[str, Any], name: str, default: dict[str, Any]) -> dict[str, Any]:
+    """省略できる設定sectionを取得する。"""
+    value = raw.get(name, default)
     if not isinstance(value, dict):
         raise ValueError(f"Config section {name!r} must be an object.")
     return value
@@ -150,12 +172,22 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("data.batch_size must be positive.")
     if config.data.num_workers < 0:
         raise ValueError("data.num_workers cannot be negative.")
-    if config.model.name != "cifar_cnn":
-        raise ValueError("Only model.name='cifar_cnn' is implemented currently.")
+    if config.model.name not in {"cifar_cnn", "qat_cifar_cnn"}:
+        raise ValueError("model.name must be 'cifar_cnn' or 'qat_cifar_cnn'.")
     if config.model.num_classes != 10:
         raise ValueError("CIFAR-10 requires model.num_classes=10.")
     if config.model.load_weight and not config.model.weight_path.strip():
         raise ValueError("model.weight_path must not be empty when model.load_weight=true.")
+    if config.quantization.weight_bits not in {2, 4, 8, 16}:
+        raise ValueError("quantization.weight_bits must be 2, 4, 8, or 16.")
+    if config.quantization.activation_bits not in {2, 4, 8, 16}:
+        raise ValueError("quantization.activation_bits must be 2, 4, 8, or 16.")
+    if config.quantization.input_bits != 8:
+        raise ValueError("quantization.input_bits must be 8 because image input is uint8.")
+    if config.quantization.rounding not in {"ties_away_from_zero", "ties_to_positive", "ties_to_even"}:
+        raise ValueError("Unsupported quantization.rounding value.")
+    if config.model.name == "qat_cifar_cnn" and config.data.normalization != "zero_one":
+        raise ValueError("qat_cifar_cnn requires data.normalization='zero_one' for uint8 input.")
     if config.train.epochs <= 0:
         raise ValueError("train.epochs must be positive.")
     if config.train.learning_rate <= 0:

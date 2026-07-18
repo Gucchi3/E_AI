@@ -1,6 +1,6 @@
 # E_AI
 
-Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなFP32 CNN学習コードです。入口は`main.py`だけで、設定は`config.json`にまとめています。
+Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなCNN学習コードです。FP32学習と基礎的な整数QATに対応しています。入口は`main.py`だけで、設定はJSONへまとめています。
 
 ## セットアップ
 
@@ -24,6 +24,12 @@ python main.py
 python main.py --config my_config.json
 ```
 
+小型QATモデルを学習する場合は、付属の設定を指定します。
+
+```powershell
+python main.py --config config_qat.json
+```
+
 主な設定は次のとおりです。
 
 - `run.device`: `auto`、`cpu`、`cuda`
@@ -33,6 +39,10 @@ python main.py --config my_config.json
 - `data.batch_size`、`data.num_workers`
 - `model.load_weight`: 学習済み重みを読み込む場合は`true`
 - `model.weight_path`: 読み込む`.pth`ファイルのパス
+- `quantization.weight_bits`: 重みの整数bit数。`2`、`4`、`8`、`16`
+- `quantization.activation_bits`: 活性の整数bit数。`2`、`4`、`8`、`16`
+- `quantization.input_bits`: `uint8`入力に合わせて現在は`8`
+- `quantization.rounding`: `ties_away_from_zero`、`ties_to_positive`、`ties_to_even`
 - `train.epochs`、`train.learning_rate`、`train.weight_decay`、`train.label_smoothing`
 
 学習済み重みを使う場合は、`config.json`を次のように設定します。
@@ -47,6 +57,12 @@ python main.py --config my_config.json
 ```
 
 raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持つcheckpointを読み込めます。モデル構造と重みの構造は一致している必要があります。
+
+## QAT
+
+`qat_cifar_cnn`は、重みを出力チャネル単位、ReLU後の活性をTensor単位でFake Quantizationします。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+
+量子化部品は`utils/quantization/`内で完結しており、PyTorch以外のプロジェクト内moduleへ依存しません。scaleは各`IntegerQuantizer`の`scale`、整数値は`quantize()`の結果から取得できます。現在は基礎実装に絞り、Observer、freeze/unfreeze、BatchNorm fold、FP4は含めていません。
 
 ## 表示
 

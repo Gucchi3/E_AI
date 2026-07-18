@@ -42,6 +42,13 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Model", "MACs", macs)
     table.add_row("")
 
+    if config.model.name == "qat_cifar_cnn":
+        table.add_row("Quantization", "Weight Bits", str(config.quantization.weight_bits))
+        table.add_row("Quantization", "Activation Bits", str(config.quantization.activation_bits))
+        table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
+        table.add_row("Quantization", "Rounding", config.quantization.rounding)
+        table.add_row("")
+
     table.add_row("Data", "Dataset", config.data.dataset.upper())
     table.add_row("Data", "Data Dir", config.data.root)
     table.add_row("Data", "Normalization", config.data.normalization)
