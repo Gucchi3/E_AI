@@ -21,7 +21,7 @@ E_AI/
     ├── data.py             # CIFAR-10 transformとDataLoader
     ├── display.py          # Q_ViT準拠のRich表示
     ├── engine.py           # 1 epochのtrainとevaluate
-    ├── profiling.py        # MACsとFLOPsの計測
+    ├── profiling.py        # MACsの計測
     ├── runtime.py          # seedとdeviceの選択
     └── workflows.py        # 学習全体の組み立て
 ```
@@ -33,7 +33,7 @@ E_AI/
 - 学習設定は`rich.Table`の「Training Configuration」で表示する。
 - 表示項目名と並びは、実装済みの設定に限ってQ_ViTへ合わせる。
 - epoch結果はRichで項目ごとに色分けし、文字の並びはQ_ViTの簡潔な書式に合わせる。
-- MACsは`thop.profile`で計測し、FLOPsは`MACs × 2`とする。
+- MACsは`thop.profile`で計測する。計測エラーは`N/A`へ変換せず、そのまま表示する。
 - best weightの更新や最終weightの保存について独自メッセージを追加しない。
 - 標準`logging`を学習表示へ持ち込まない。
 
@@ -53,7 +53,7 @@ E_AI/
 | ファイル | 内容 |
 | --- | --- |
 | `config.json` | 検証済みの実行設定 |
-| `training_info.json` | device、PyTorch、モデル、MACs、FLOPs、入力の基本情報 |
+| `training_info.json` | device、PyTorch、モデル、MACs、入力の基本情報 |
 | `metrics.jsonl` | epochごとのlossとaccuracy |
 | `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
 | `model_best.pth` | test accuracyが最良だったモデルの`state_dict` |

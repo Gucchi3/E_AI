@@ -14,8 +14,10 @@
     "num_workers"  : 0
   },
   "model": {
-    "name"       : "cifar_cnn",
-    "num_classes": 10
+    "name"        : "cifar_cnn",
+    "num_classes" : 10,
+    "load_weight" : false,
+    "weight_path": ""
   },
   "train": {
     "epochs"         : 20,

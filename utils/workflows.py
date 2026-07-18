@@ -11,25 +11,29 @@ from model import build_model
 from .artifacts import EpochRecord, RunArtifacts
 from .config import AppConfig
 from .data import make_cifar10_loaders
-from .display import print_epoch, print_training_info
+from .display import print_epoch, print_training_info, print_weight_loaded
 from .engine import evaluate, train_one_epoch
-from .profiling import get_macs_and_flops
+from .profiling import get_macs
 from .runtime import select_device, set_seed
+from .weights import load_model_weight
 
 
 def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
-    device                    = select_device(config.run.device)
-    train_loader, test_loader = make_cifar10_loaders(config.data, device)
+    device = select_device(config.run.device)
+    model  = build_model(config.model.name, config.model.num_classes).to(device)
+    if config.model.load_weight:
+        weight_path = load_model_weight(model, device, config.model.weight_path)
+        print_weight_loaded(weight_path)
 
-    model     = build_model(config.model.name, config.model.num_classes).to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config.train.learning_rate, weight_decay=config.train.weight_decay)
-    criterion = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
+    train_loader, test_loader = make_cifar10_loaders(config.data, device)
+    optimizer                 = torch.optim.AdamW(model.parameters(), lr=config.train.learning_rate, weight_decay=config.train.weight_decay)
+    criterion                 = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
 
     artifacts       = RunArtifacts.create(config.run.log_dir)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
-    macs, flops     = get_macs_and_flops(model, device, config.data.image_size)
+    macs            = get_macs(model, device, config.data.image_size)
     artifacts.save_json("config.json", asdict(config))
 
     training_info = {
@@ -37,13 +41,14 @@ def run_train(config: AppConfig) -> None:
         "pytorch_version": torch.__version__,
         "model_name": config.model.name,
         "parameter_count": parameter_count,
+        "load_weight": config.model.load_weight,
+        "weight_path": config.model.weight_path,
         "macs": macs,
-        "flops": flops,
         "image_size": config.data.image_size,
         "normalization": config.data.normalization,
     }
     artifacts.save_json("training_info.json", training_info)
-    print_training_info(config, model, device, artifacts.run_dir, macs, flops)
+    print_training_info(config, model, device, artifacts.run_dir, macs)
 
     best_accuracy = -1.0
     for epoch in range(1, config.train.epochs + 1):

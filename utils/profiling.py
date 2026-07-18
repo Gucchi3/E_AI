@@ -1,4 +1,4 @@
-"""モデルの計算量を計測する。"""
+"""モデルのMACsを計測する。"""
 
 from __future__ import annotations
 
@@ -6,24 +6,21 @@ import warnings
 
 import torch
 from torch import nn
+from thop import profile
 
 
-def get_macs_and_flops(model: nn.Module, device: torch.device, image_size: int) -> tuple[str, str]:
-    """1枚の画像を入力したときのMACsとFLOPsを返す。"""
+def get_macs(model: nn.Module, device: torch.device, image_size: int) -> str:
+    """thopでMACsを計測する。"""
     was_training = model.training
     try:
-        from thop import profile
-
         input_tensor = torch.randn(1, 3, image_size, image_size, device=device)
         with warnings.catch_warnings(), torch.no_grad():
             warnings.simplefilter("ignore")
             macs, _ = profile(model, inputs=(input_tensor,), verbose=False)
-        flops = macs * 2
-        return _format_count(macs), _format_count(flops)
-    except Exception:
-        return "N/A", "N/A"
     finally:
         model.train(was_training)
+
+    return _format_count(macs)
 
 
 def _format_count(value: float) -> str:

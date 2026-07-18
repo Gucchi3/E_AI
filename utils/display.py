@@ -15,7 +15,7 @@ from .config import AppConfig
 CONSOLE = Console()
 
 
-def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path, macs: str, flops: str) -> None:
+def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path, macs: str) -> None:
     """学習設定を表形式で表示する。"""
     total_params     = sum(parameter.numel() for parameter in model.parameters())
     trainable_params = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
@@ -32,12 +32,14 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("")
 
     table.add_row("Model", "Name", config.model.name)
+    table.add_row("Model", "Pretrained", str(config.model.load_weight))
+    if config.model.load_weight:
+        table.add_row("Model", "Weight Path", config.model.weight_path)
     table.add_row("Model", "Image Size", str(config.data.image_size))
     table.add_row("Model", "Num Classes", str(config.model.num_classes))
     table.add_row("Model", "Total Params", f"{total_params:,} ({total_params / 1e6:.2f}M)")
     table.add_row("Model", "Trainable Params", f"{trainable_params:,}")
     table.add_row("Model", "MACs", macs)
-    table.add_row("Model", "FLOPs", flops)
     table.add_row("")
 
     table.add_row("Data", "Dataset", config.data.dataset.upper())
@@ -58,6 +60,14 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     CONSOLE.print()
     CONSOLE.print(table)
     CONSOLE.print()
+
+
+def print_weight_loaded(weight_path: Path) -> None:
+    """読み込んだ重みのパスを表示する。"""
+    line = Text()
+    line.append("[OK]", style="bold green")
+    line.append(f" Loaded weights from {weight_path}")
+    CONSOLE.print(line)
 
 
 def print_epoch(epoch: int, epochs: int, learning_rate: float, train_loss: float, test_loss: float, accuracy: float) -> None:

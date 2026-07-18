@@ -35,7 +35,7 @@ python main.py --config my_config.json
 
 ## 表示
 
-実行時の設定は、Q_ViTと同じ`rich.Table`の「Training Configuration」として表示されます。パラメータ数に加えて、1枚の画像を入力したときのMACsとFLOPsも表示します。
+実行時の設定は、Q_ViTと同じ`rich.Table`の「Training Configuration」として表示されます。パラメータ数に加えて、1枚の画像を入力したときのMACsも表示します。
 
 各epochは`Epoch`、`lr`、`train_loss`、`test_loss`、`acc`をRichで色分けします。文字としての書式は次のとおりです。
 
@@ -50,7 +50,7 @@ best weightの更新は画面へ出力しません。
 実行ごとに`run.log_dir/YYYYMMDD_HHMMSS/`を作り、次を保存します。
 
 - `config.json`: 実際に使用した設定
-- `training_info.json`: device、PyTorch、モデル、MACs、FLOPs、入力の基本情報
+- `training_info.json`: device、PyTorch、モデル、MACs、入力の基本情報
 - `metrics.jsonl`: epochごとのlossとaccuracy
 - `curves.png`: train/test lossとtest accuracyの曲線。accuracyは赤線で、凡例にlatestとbestを表示
 - `model_best.pth`: test accuracyが最良だったモデルの`state_dict`

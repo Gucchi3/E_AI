@@ -36,8 +36,10 @@ class DataConfig:
 class ModelConfig:
     """モデルの設定。"""
 
-    name       : str
-    num_classes: int
+    name        : str
+    num_classes : int
+    load_weight : bool
+    weight_path: str
 
 
 
@@ -82,7 +84,7 @@ def load_config(path: str | Path) -> AppConfig:
 
     run_config   = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
     data_config  = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
-    model_config = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"))
+    model_config = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
     train_config = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
     config       = AppConfig(run=run_config, data=data_config, model=model_config, train=train_config)
     _validate(config)
@@ -122,6 +124,14 @@ def _number(raw: dict[str, Any], name: str) -> float:
     return float(value)
 
 
+def _boolean(raw: dict[str, Any], name: str) -> bool:
+    """真偽値の設定値を取り出す。"""
+    value = raw.get(name)
+    if not isinstance(value, bool):
+        raise ValueError(f"Config value {name!r} must be a boolean.")
+    return value
+
+
 def _validate(config: AppConfig) -> None:
     """設定値の組み合わせを検証する。"""
     if config.run.mode != "train":
@@ -144,6 +154,8 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("Only model.name='cifar_cnn' is implemented currently.")
     if config.model.num_classes != 10:
         raise ValueError("CIFAR-10 requires model.num_classes=10.")
+    if config.model.load_weight and not config.model.weight_path.strip():
+        raise ValueError("model.weight_path must not be empty when model.load_weight=true.")
     if config.train.epochs <= 0:
         raise ValueError("train.epochs must be positive.")
     if config.train.learning_rate <= 0:
