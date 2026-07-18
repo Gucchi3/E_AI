@@ -54,6 +54,8 @@ test_activation = activation_quantizer(test_activation)
 5. best/finalモデル保存時は重みとすべての量子化bufferを同じ`state_dict`へ保存する。
 6. checkpoint読込時はscaleとrunning rangeも復元し、QATを継続できる。
 
+`QuantBNConv2d`は学習中にrunning統計を更新しながら、running統計でfoldした重みのFake Quantizationを行います。評価時はBatchNormを重みとbiasへ完全にfoldするため、推論グラフにBatchNorm演算は残りません。fold後のbias scaleは`input_scale * weight_scale`で、int32としてFake Quantizationします。`weight_quantizer.scale`と`bias_scale`はstate_dictへ保存されます。
+
 MAC計測はモデルのコピーで行い、本物のモデルのrunning rangeとBatchNorm統計を変更しません。
 
 ## 入力画像
@@ -79,8 +81,8 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | 旧checkpointの重み読込 | 実装済み | 量子化bufferがない旧重みからQATを開始するため必要 |
 | 分布可視化observer | 保留 | 現在のQAT学習には不要 |
 | 手動calibration | 保留 | 学習済みEMAを検証してから追加 |
-| BatchNorm fold | 保留 | 整数推論変換の段階で追加 |
-| biasの整数化 | 保留 | 入出力scaleを接続する段階で追加 |
+| BatchNorm fold | 実装済み | fold後の重みをper-channel量子化 |
+| fold後biasのint32量子化 | 実装済み | `input_scale * weight_scale`を使用 |
 | 整数requantization | 保留 | CV32E40P向けexport時に追加 |
 | 重み・scaleのC配列export | 保留 | 推論レイアウト確定後に追加 |
 | FP4Quantizer | 保留 | 整数QATの検証後に追加 |

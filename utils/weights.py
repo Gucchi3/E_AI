@@ -25,9 +25,31 @@ def load_model_weight(model: nn.Module, device: torch.device, weight_path: str |
     if not isinstance(state_dict, dict):
         raise ValueError(f"Weight file does not contain a state_dict: {path}")
 
-    incompatible    = model.load_state_dict(state_dict, strict=False)
-    allowed_missing = (".scale", ".running_min", ".running_max", ".range_initialized")
-    invalid_missing = [name for name in incompatible.missing_keys if not name.endswith(allowed_missing)]
-    if invalid_missing or incompatible.unexpected_keys:
-        raise RuntimeError(f"Weight structure does not match the model. Missing: {invalid_missing}, unexpected: {incompatible.unexpected_keys}")
+    mapped_state, unused_keys = _map_state_dict(model, state_dict)
+    incompatible              = model.load_state_dict(mapped_state, strict=False)
+    allowed_missing           = (".scale", ".running_min", ".running_max", ".range_initialized", ".bias_scale")
+    invalid_missing           = [name for name in incompatible.missing_keys if not name.endswith(allowed_missing)]
+    unexpected                = sorted(set(unused_keys) | set(incompatible.unexpected_keys))
+    if invalid_missing or unexpected:
+        raise RuntimeError(f"Weight structure does not match the model. Missing: {invalid_missing}, unexpected: {unexpected}")
     return path
+
+
+def _map_state_dict(model: nn.Module, state_dict: dict[str, torch.Tensor]) -> tuple[dict[str, torch.Tensor], list[str]]:
+    """FP32のConv・BNキーをfold対応QATモデルへ対応付ける。"""
+    mapped_state = {}
+    used_keys    = set()
+    for target_name in model.state_dict():
+        source_name = _fp32_source_name(target_name)
+        for candidate in (target_name, source_name):
+            if candidate in state_dict:
+                mapped_state[target_name] = state_dict[candidate]
+                used_keys.add(candidate)
+                break
+    unused_keys = [name for name in state_dict if name not in used_keys]
+    return mapped_state, unused_keys
+
+
+def _fp32_source_name(target_name: str) -> str:
+    """fold対応QATモデルのキーからFP32モデルのキーを作る。"""
+    return target_name.replace(".conv.conv.", ".conv.").replace(".conv.norm.", ".norm.")

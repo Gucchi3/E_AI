@@ -63,6 +63,10 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Training", "Minimum LR", str(config.train.minimum_learning_rate))
     table.add_row("Training", "Weight Decay", f"{config.train.weight_decay:g}")
     table.add_row("Training", "Label Smooth", f"{config.train.label_smoothing:g}")
+    table.add_row("Augmentation", "MixUp Alpha", f"{config.train.mixup_alpha:g}")
+    table.add_row("Augmentation", "CutMix Alpha", f"{config.train.cutmix_alpha:g}")
+    table.add_row("Augmentation", "Mix Probability", f"{config.train.mixup_probability:g}")
+    table.add_row("Augmentation", "Switch Probability", f"{config.train.mixup_switch_probability:g}")
     table.add_row("")
 
     table.add_row("Output", "Run Directory", str(run_dir))

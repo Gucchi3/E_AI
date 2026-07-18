@@ -8,6 +8,7 @@ import torch
 from torch import nn
 
 from model import build_model
+from .augmentation import BatchMixupCutmix
 from .artifacts import EpochRecord, RunArtifacts
 from .config import AppConfig
 from .data import make_cifar10_loaders
@@ -22,7 +23,7 @@ def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
     device = select_device(config.run.device)
-    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding, config.quantization.activation_range_momentum).to(device)
+    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding, config.quantization.activation_range_momentum, config.data.image_size).to(device)
     if config.model.load_weight:
         weight_path = load_model_weight(model, device, config.model.weight_path)
         print_weight_loaded(weight_path)
@@ -30,7 +31,9 @@ def run_train(config: AppConfig) -> None:
     train_loader, test_loader = make_cifar10_loaders(config.data, device)
     optimizer                 = torch.optim.AdamW(model.parameters(), lr=config.train.learning_rate, weight_decay=config.train.weight_decay)
     scheduler                 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.train.epochs, eta_min=config.train.minimum_learning_rate)
-    criterion                 = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
+    batch_augmentation        = BatchMixupCutmix(config.model.num_classes, config.train.mixup_alpha, config.train.cutmix_alpha, config.train.mixup_probability, config.train.mixup_switch_probability)
+    train_criterion           = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
+    test_criterion            = nn.CrossEntropyLoss()
 
     artifacts       = RunArtifacts.create(config.run.log_dir)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
@@ -54,8 +57,8 @@ def run_train(config: AppConfig) -> None:
 
     best_accuracy = -1.0
     for epoch in range(1, config.train.epochs + 1):
-        train_metrics = train_one_epoch(model, train_loader, optimizer, criterion, device)
-        test_metrics  = evaluate(model, test_loader, criterion, device)
+        train_metrics = train_one_epoch(model, train_loader, optimizer, train_criterion, device, batch_augmentation)
+        test_metrics  = evaluate(model, test_loader, test_criterion, device)
         learning_rate = optimizer.param_groups[0]["lr"]
         record        = EpochRecord(epoch=epoch, learning_rate=learning_rate, train_loss=train_metrics.loss, train_accuracy=train_metrics.accuracy, test_loss=test_metrics.loss, test_accuracy=test_metrics.accuracy)
         artifacts.record_epoch(record)

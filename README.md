@@ -46,6 +46,11 @@ python main.py --config config_qat.json
 - `quantization.activation_range_momentum`: 活性rangeの移動平均。Q_ViTと同じ既定値は`0.95`
 - `train.epochs`、`train.learning_rate`、`train.minimum_learning_rate`
 - `train.weight_decay`、`train.label_smoothing`
+- `train.mixup_alpha`、`train.cutmix_alpha`: `0`で個別に無効化
+- `train.mixup_probability`: MixUpまたはCutMixを適用する確率
+- `train.mixup_switch_probability`: 両方が有効な場合にCutMixを選ぶ確率
+
+MixUpとCutMixはQ_ViTと同じバッチ単位で適用します。学習accuracyは混合比率に応じた期待正解率です。両方を無効にする場合は`mixup_alpha`と`cutmix_alpha`を`0`にします。
 
 学習済み重みを使う場合は、`config.json`を次のように設定します。
 
@@ -62,7 +67,9 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 
 ## QAT
 
-`qat_cifar_cnn`は、重みを出力チャネル単位、ReLU後の活性をTensor単位でFake Quantizationします。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+`qat_cifar_cnn`は、重みを出力チャネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みをper-channel int8、biasを入力scaleと重みscaleに対応するint32として量子化します。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+
+FP32モデルとQATモデルは平均プーリングを使用しません。空間方向は畳み込みで1×1まで変換し、Flatten後に線形層へ入力します。
 
 活性rangeは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scale、running range、初期化状態は重みと同じ`state_dict`へ保存されるため、`model_best.pth`と`model_final.pth`から復元できます。
 

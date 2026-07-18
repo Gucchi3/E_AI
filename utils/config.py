@@ -59,11 +59,15 @@ class QuantizationConfig:
 class TrainConfig:
     """学習条件の設定。"""
 
-    epochs               : int
-    learning_rate        : float
-    minimum_learning_rate: float
-    weight_decay         : float
-    label_smoothing      : float
+    epochs                      : int
+    learning_rate               : float
+    minimum_learning_rate       : float
+    weight_decay                : float
+    label_smoothing             : float
+    mixup_alpha                 : float
+    cutmix_alpha                : float
+    mixup_probability           : float
+    mixup_switch_probability    : float
 
 
 
@@ -101,7 +105,7 @@ def load_config(path: str | Path) -> AppConfig:
     data_config         = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
     model_config        = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
     quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), rounding=_string(quant_raw, "rounding"), activation_range_momentum=_number_or_default(quant_raw, "activation_range_momentum", 0.95))
-    train_config        = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), minimum_learning_rate=_number_or_default(train_raw, "minimum_learning_rate", 0.0), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
+    train_config        = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), minimum_learning_rate=_number_or_default(train_raw, "minimum_learning_rate", 0.0), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"), mixup_alpha=_number_or_default(train_raw, "mixup_alpha", 0.0), cutmix_alpha=_number_or_default(train_raw, "cutmix_alpha", 0.0), mixup_probability=_number_or_default(train_raw, "mixup_probability", 1.0), mixup_switch_probability=_number_or_default(train_raw, "mixup_switch_probability", 0.5))
     config              = AppConfig(run=run_config, data=data_config, model=model_config, quantization=quantization_config, train=train_config)
     _validate(config)
 
@@ -210,3 +214,11 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("train.weight_decay cannot be negative.")
     if not 0.0 <= config.train.label_smoothing < 1.0:
         raise ValueError("train.label_smoothing must be in [0.0, 1.0).")
+    if config.train.mixup_alpha < 0.0:
+        raise ValueError("train.mixup_alpha cannot be negative.")
+    if config.train.cutmix_alpha < 0.0:
+        raise ValueError("train.cutmix_alpha cannot be negative.")
+    if not 0.0 <= config.train.mixup_probability <= 1.0:
+        raise ValueError("train.mixup_probability must be in [0.0, 1.0].")
+    if not 0.0 <= config.train.mixup_switch_probability <= 1.0:
+        raise ValueError("train.mixup_switch_probability must be in [0.0, 1.0].")

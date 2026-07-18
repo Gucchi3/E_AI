@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscaleとrunning rangeはモデルのstate_dictへ保存します。分布可視化observer、BatchNorm fold、整数export、FP4、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscale、running range、BN fold後のweight scaleとbias scaleはモデルのstate_dictへ保存します。分布可視化observer、整数export、FP4、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -18,12 +18,14 @@ E_AI/
 │   └── qat_cnn.py          # TinyQATCNN
 └── utils/
     ├── artifacts.py        # 実行結果、曲線、重みの保存
+    ├── augmentation.py     # バッチ単位のMixUpとCutMix
     ├── config.py           # JSON読込、型変換、検証
     ├── data.py             # CIFAR-10 transformとDataLoader
     ├── display.py          # Q_ViT準拠のRich表示
     ├── engine.py           # 1 epochのtrainとevaluate
     ├── profiling.py        # MACsの計測
     ├── quantization/       # 単独でコピーできる整数QAT部品
+    │   └── batch_norm.py   # BatchNorm fold
     ├── runtime.py          # seedとdeviceの選択
     ├── weights.py          # 学習済み重みの読込
     └── workflows.py        # 学習全体の組み立て
