@@ -16,13 +16,19 @@ python tools/print_pth.py log/20260719_120000/model_best.pth
 python tools/print_pth.py log/20260719_120000/model_best.pth --full
 ```
 
-整数型Tensorだけを表示する場合は`--integer`を付けます。
+量子化重みと保存済みの整数型Tensorだけを表示する場合は`--integer`を付けます。Convの重みはrunning統計でBatchNormをfoldしてから整数へ変換します。重みbit数と丸め方式は`.pth`と同じフォルダの`config.json`から読み込みます。
 
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --integer
 ```
 
-整数型Tensorの全要素を表示する場合は併用できます。
+`config.json`がない場合や設定を変更する場合は明示できます。
+
+```powershell
+python tools/print_pth.py model_best.pth --integer --weight-bits 8 --rounding ties_away_from_zero
+```
+
+整数重みを含む全要素を表示する場合は併用できます。
 
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --integer --full

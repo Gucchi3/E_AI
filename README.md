@@ -36,7 +36,7 @@ python main.py --config config_qat.json
 python tools/print_pth.py log/20260719_120000/model_best.pth
 ```
 
-整数型Tensorだけを確認する場合は`--integer`を付けます。
+BNをfoldした整数重みと保存済み整数Tensorだけを確認する場合は`--integer`を付けます。
 
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --integer
