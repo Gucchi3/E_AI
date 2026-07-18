@@ -1,0 +1,26 @@
+{
+  "run": {
+    "mode"   : "train",
+    "seed"   : 0,
+    "device" : "auto",
+    "log_dir": "log"
+  },
+  "data": {
+    "dataset"      : "cifar10",
+    "root"         : "data",
+    "image_size"   : 32,
+    "normalization": "cifar10",
+    "batch_size"   : 128,
+    "num_workers"  : 0
+  },
+  "model": {
+    "name"       : "cifar_cnn",
+    "num_classes": 10
+  },
+  "train": {
+    "epochs"         : 20,
+    "learning_rate"  : 0.001,
+    "weight_decay"   : 0.0001,
+    "label_smoothing": 0.0
+  }
+}

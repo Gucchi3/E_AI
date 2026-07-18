@@ -1,0 +1,7 @@
+# Downloaded data and generated training artifacts
+data/
+log/
+
+# Python runtime files
+__pycache__/
+*.py[cod]
