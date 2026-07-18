@@ -36,6 +36,12 @@ python main.py --config config_qat.json
 python tools/print_pth.py log/20260719_120000/model_best.pth
 ```
 
+整数型Tensorだけを確認する場合は`--integer`を付けます。
+
+```powershell
+python tools/print_pth.py log/20260719_120000/model_best.pth --integer
+```
+
 主な設定は次のとおりです。
 
 - `run.device`: `auto`、`cpu`、`cuda`

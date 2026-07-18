@@ -15,3 +15,15 @@ python tools/print_pth.py log/20260719_120000/model_best.pth
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --full
 ```
+
+整数型Tensorだけを表示する場合は`--integer`を付けます。
+
+```powershell
+python tools/print_pth.py log/20260719_120000/model_best.pth --integer
+```
+
+整数型Tensorの全要素を表示する場合は併用できます。
+
+```powershell
+python tools/print_pth.py log/20260719_120000/model_best.pth --integer --full
+```
