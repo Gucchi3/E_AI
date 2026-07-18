@@ -67,7 +67,7 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 
 ## QAT
 
-`qat_cifar_cnn`は、重みを出力チャネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みをper-channel整数、biasを入力scaleと重みscaleに対応するint32として量子化します。ConvとLinearは量子化後にdequantizeした浮動小数点Tensorで通常演算し、整数推論処理を混在させません。各Convブロック後だけ、Q31のsigned int32 multiplierとint32右shiftによる再量子化誤差を加えます。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+`qat_cifar_cnn`は、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みを出力チャンネル単位の整数、biasを入力scaleと重みscaleに対応するint32として量子化します。ConvとLinearは量子化後にdequantizeした浮動小数点Tensorで通常演算し、整数推論処理を混在させません。各Convブロック後だけ、Q31のsigned int32 multiplierとint32右shiftによる再量子化誤差を加えます。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
 
 FP32モデルとQATモデルは平均プーリングを使用しません。空間方向は畳み込みで1×1まで変換し、Flatten後に線形層へ入力します。
 

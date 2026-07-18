@@ -23,7 +23,7 @@ print(integer_result.scale)
 
 `forward()`はSTEを使うためQATで勾配を計算できます。`quantize()`は推論実装の確認に使う整数値、scale、zero pointを返します。現在のzero pointは常に0です。
 
-重みのscaleをチャネル単位にする場合は`channel_axis=0`と`channel_size`を指定します。`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`では出力数を`channel_size`として使用しています。重みscaleは現在の重みからforwardごとに計算し、最新値をbufferへ保存します。
+重みのscaleをチャンネル単位にする場合は`channel_axis=0`と`channel_size`を指定します。`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`では出力数を`channel_size`として使用しています。重みscaleは現在の重みからforwardごとに計算し、最新値をbufferへ保存します。
 
 ## 活性range
 
@@ -48,7 +48,7 @@ test_activation = activation_quantizer(test_activation)
 ## 現在のQATフロー
 
 1. 入力は`uint8`に対応する固定scale `1/255`でFake Quantizationする。
-2. 重みはforward時の現在値からチャネル別scaleを計算する。
+2. 重みはforward時の現在値からチャンネル別scaleを計算する。
 3. 活性は学習中のmin/maxをEMAで更新し、そのrangeからscaleを計算する。
 4. ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算する。
 5. Convブロック後だけ、Q31 multiplierと右shiftによる再量子化誤差を加える。
@@ -72,7 +72,7 @@ real_multiplier ≒ multiplier / 2^shift
 output_integer   = round((input_integer × multiplier) / 2^shift)
 ```
 
-forwardでは通常のConvやLinearとは独立してQ31再量子化誤差を加えます。各出力チャネルの`multiplier`と`shift`はint32 bufferとしてstate_dictへ保存されます。accumulator overflowやCV32E40P上の命令列はまだ模擬しません。
+forwardでは通常のConvやLinearとは独立してQ31再量子化誤差を加えます。各出力チャンネルの`multiplier`と`shift`はint32 bufferとしてstate_dictへ保存されます。accumulator overflowやCV32E40P上の命令列はまだ模擬しません。
 
 MAC計測はモデルのコピーで行い、本物のモデルのrunning rangeとBatchNorm統計を変更しません。
 
@@ -90,7 +90,7 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | --- | --- | --- |
 | INT2/4/8/16 Fake Quantization | 実装済み | QATの基礎として必要 |
 | ties-away-from-zero丸め | 実装済み | CV32E40P向けの丸め一致に必要 |
-| 重みのチャネル別scale | 実装済み | ConvとLinearの重み量子化に必要 |
+| 重みのチャンネル別scale | 実装済み | ConvとLinearの重み量子化に必要 |
 | 活性rangeのEMA | 実装済み | 安定したQATに必要 |
 | 評価時の活性scale固定 | 実装済み | batch非依存の評価に必要 |
 | scale/rangeのstate_dict保存 | 実装済み | checkpointと将来のexportに必要 |

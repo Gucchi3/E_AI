@@ -89,7 +89,7 @@ class FixedPointRequantizer(nn.Module):
 
 
 def _channel_view(value: torch.Tensor, ndim: int) -> torch.Tensor:
-    """チャネル別TensorをNCHWまたはNCへbroadcastできる形にする。"""
+    """チャンネル別TensorをNCHWまたはNCへbroadcastできる形にする。"""
     if ndim < 2:
         raise ValueError("Requantization input must have at least two dimensions.")
     return value.reshape((1, value.numel()) + (1,) * (ndim - 2))

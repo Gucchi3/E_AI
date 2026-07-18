@@ -30,7 +30,7 @@ class QuantConv2d(nn.Conv2d):
 
     @property
     def weight_scale(self) -> torch.Tensor:
-        """出力チャネル単位のweight scaleを返す。"""
+        """出力チャンネル単位のweight scaleを返す。"""
         return self.weight_quantizer.scale
 
 
@@ -67,7 +67,7 @@ class QuantBNConv2d(nn.Module):
 
     @property
     def weight_scale(self) -> torch.Tensor:
-        """fold後の重みに使用したチャネル別scaleを返す。"""
+        """fold後の重みに使用したチャンネル別scaleを返す。"""
         return self.weight_quantizer.scale
 
 
