@@ -75,7 +75,7 @@ class RunArtifacts:
         axes[0].plot(epochs, [record.test_loss for record in self.history], label="test")
         axes[0].set(title="Loss", xlabel="Epoch", ylabel="Cross-entropy")
 
-        axes[1].plot(epochs, [record.train_accuracy * 100 for record in self.history], label="train")
+        # axes[1].plot(epochs, [record.train_accuracy * 100 for record in self.history], label="train")
         axes[1].plot(epochs, [record.test_accuracy * 100 for record in self.history], label="test")
         axes[1].set(title="Accuracy", xlabel="Epoch", ylabel="Percent", ylim=(0, 100))
 

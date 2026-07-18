@@ -54,21 +54,12 @@ def run_train(config: AppConfig) -> None:
         test_metrics  = evaluate(model, test_loader, criterion, device)
         record        = EpochRecord(epoch=epoch, train_loss=train_metrics.loss, train_accuracy=train_metrics.accuracy, test_loss=test_metrics.loss, test_accuracy=test_metrics.accuracy)
         artifacts.record_epoch(record)
-        artifacts.logger.info(
-            "Epoch %03d/%03d | train loss %.4f | train acc %.2f%% | "
-            "test loss %.4f | test acc %.2f%%",
-            epoch,
-            config.train.epochs,
-            record.train_loss,
-            record.train_accuracy * 100,
-            record.test_loss,
-            record.test_accuracy * 100,
-        )
+        artifacts.logger.info("Epoch %03d/%03d | train loss %.4f | train acc %.2f%% | test loss %.4f | test acc %.2f%%", epoch, config.train.epochs, record.train_loss, record.train_accuracy * 100, record.test_loss, record.test_accuracy * 100)
 
         if record.test_accuracy > best_accuracy:
             best_accuracy = record.test_accuracy
             best_path     = artifacts.save_model(model, "model_best.pth")
-            artifacts.logger.info("Saved new best weights: %s", best_path.name)
+            # artifacts.logger.info("Saved new best weights: %s", best_path.name) # I think not need/
 
     final_path = artifacts.save_model(model, "model_final.pth")
     artifacts.logger.info("Saved final weights: %s", final_path.name)
