@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from utils.quantization import IntegerQuantizer, QuantBNConv2d, QuantLinear
+from utils.quantization import FixedPointRequantizer, IntegerQuantizer, QuantBNConv2d, QuantLinear
 
 
 class QuantConvBlock(nn.Module):
@@ -16,13 +16,14 @@ class QuantConvBlock(nn.Module):
         self.conv                 = QuantBNConv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=False, weight_bits=weight_bits, rounding=rounding)
         self.activation           = nn.ReLU(inplace=False)
         self.activation_quantizer = IntegerQuantizer(bit_width=activation_bits, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
+        self.requantizer          = FixedPointRequantizer(channels=out_channels, bit_width=activation_bits, signed=False, rounding=rounding)
 
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
-        """BN fold対応畳み込み後の非負活性を量子化する。"""
-        value = self.conv(value, input_scale)
-        value = self.activation(value)
-        return self.activation_quantizer(value)
+        """Fake Quantization畳み込み後の活性を再量子化する。"""
+        value        = self.activation(self.conv(value, input_scale))
+        output_scale = self.activation_quantizer.scale_for(value)
+        return self.requantizer(value, self.conv.bias_scale, output_scale)
 
 
 
@@ -50,4 +51,4 @@ class TinyQATCNN(nn.Module):
         value = self.stage2(value, self.stage1.activation_quantizer.scale)
         value = self.head(value, self.stage2.activation_quantizer.scale)
         value = torch.flatten(value, start_dim=1)
-        return self.classifier(value)
+        return self.classifier(value, self.head.activation_quantizer.scale)

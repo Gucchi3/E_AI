@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -11,51 +13,76 @@ from .integer import IntegerQuantizer
 from .rounding import get_rounding_function
 
 
-class QuantConv2d(nn.Conv2d):
-    """重みを出力チャネル単位でFake Quantizationする畳み込み。"""
+DEFAULT_ROUNDING = "ties_away_from_zero"
+Size2d           = int | tuple[int, int]
 
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int | tuple[int, int], stride: int | tuple[int, int] = 1, padding: int | tuple[int, int] = 0, dilation: int | tuple[int, int] = 1, groups: int = 1, bias: bool = True, padding_mode: str = "zeros", weight_bits: int = 8, rounding: str = "ties_away_from_zero") -> None:
+
+class QuantConv2d(nn.Conv2d):
+    """重みとbiasをFake Quantizationする畳み込み。"""
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Size2d, stride: Size2d = 1, padding: Size2d = 0, dilation: Size2d = 1, groups: int = 1, bias: bool = True, padding_mode: str = "zeros", weight_bits: int = 8, rounding: str = DEFAULT_ROUNDING) -> None:
         super().__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
         self.weight_quantizer = IntegerQuantizer(bit_width=weight_bits, signed=True, channel_axis=0, channel_size=out_channels, rounding=rounding)
+        self._round           = get_rounding_function(rounding)
+        self.register_buffer("bias_scale", torch.ones(out_channels, dtype=torch.float32) if bias else None)
+        self.register_buffer("bias_integer", torch.zeros(out_channels, dtype=torch.int32) if bias else None)
 
 
-    def forward(self, value: torch.Tensor) -> torch.Tensor:
-        """量子化した重みで畳み込みを行う。"""
+    @property
+    def weight_scale(self) -> torch.Tensor:
+        """出力チャネル単位のweight scaleを返す。"""
+        return self.weight_quantizer.scale
+
+
+    def forward(self, value: torch.Tensor, input_scale: torch.Tensor | None = None) -> torch.Tensor:
+        """Fake Quantizationした重みとbiasで畳み込みを行う。"""
         quantized_weight = self.weight_quantizer(self.weight)
-        return F.conv2d(value, quantized_weight, self.bias, self.stride, self.padding, self.dilation, self.groups)
+        quantized_bias   = self.bias
+        if self.bias is not None and input_scale is not None:
+            self._update_bias_scale(input_scale)
+            quantized_bias = _quantize_int32(self.bias, self.bias_scale, self.bias_integer, self._round)
+        return F.conv2d(value, quantized_weight, quantized_bias, self.stride, self.padding, self.dilation, self.groups)
+
+
+    def _update_bias_scale(self, input_scale: torch.Tensor) -> None:
+        """入力scaleとweight scaleからbias scaleを更新する。"""
+        scale = _accumulator_scale(input_scale, self.weight_scale, "QuantConv2d")
+        with torch.no_grad():
+            self.bias_scale.copy_(scale)
 
 
 
 class QuantBNConv2d(nn.Module):
     """BatchNorm fold後の重みとbiasを量子化する畳み込み層。"""
 
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: int | tuple[int, int], stride: int | tuple[int, int] = 1, padding: int | tuple[int, int] = 0, dilation: int | tuple[int, int] = 1, groups: int = 1, bias: bool = False, padding_mode: str = "zeros", weight_bits: int = 8, rounding: str = "ties_away_from_zero", batch_norm_eps: float = 1e-5, batch_norm_momentum: float = 0.1) -> None:
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: Size2d, stride: Size2d = 1, padding: Size2d = 0, dilation: Size2d = 1, groups: int = 1, bias: bool = False, padding_mode="zeros", weight_bits: int = 8, rounding: str = DEFAULT_ROUNDING, batch_norm_eps=1e-5, batch_norm_momentum=0.1) -> None:
         super().__init__()
         self.conv             = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
         self.norm             = nn.BatchNorm2d(out_channels, eps=batch_norm_eps, momentum=batch_norm_momentum)
         self.weight_quantizer = IntegerQuantizer(bit_width=weight_bits, signed=True, channel_axis=0, channel_size=out_channels, rounding=rounding)
         self._round           = get_rounding_function(rounding)
         self.register_buffer("bias_scale", torch.ones(out_channels, dtype=torch.float32))
+        self.register_buffer("bias_integer", torch.zeros(out_channels, dtype=torch.int32))
 
 
     @property
     def weight_scale(self) -> torch.Tensor:
-        """fold後の重みに使用したチャンネル別scaleを返す。"""
+        """fold後の重みに使用したチャネル別scaleを返す。"""
         return self.weight_quantizer.scale
 
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
-        """学習時はBN統計を更新し、評価時はfold済み畳み込みを行う。"""
+        """Fake Quantizationした重みとbiasで畳み込みを行う。"""
         if self.training:
             quantized_weight = self._training_weight()
             self._update_bias_scale(input_scale)
-            output           = self.conv._conv_forward(value, quantized_weight, self.conv.bias)
+            output = self.conv._conv_forward(value, quantized_weight, self.conv.bias)
             return self.norm(output)
 
         folded_weight, folded_bias = self.folded_parameters()
         quantized_weight           = self.weight_quantizer(folded_weight)
         self._update_bias_scale(input_scale)
-        quantized_bias             = self._quantize_bias(folded_bias)
+        quantized_bias             = _quantize_int32(folded_bias, self.bias_scale, self.bias_integer, self._round)
         return self.conv._conv_forward(value, quantized_weight, quantized_bias)
 
 
@@ -79,35 +106,62 @@ class QuantBNConv2d(nn.Module):
 
 
     def _update_bias_scale(self, input_scale: torch.Tensor) -> None:
-        """入力scaleと重みscaleからint32 biasのscaleを更新する。"""
-        flat_input_scale = input_scale.detach().reshape(-1)
-        if flat_input_scale.numel() != 1:
-            raise ValueError("QuantBNConv2d requires a per-tensor input scale.")
-        scale            = flat_input_scale[0].to(dtype=self.bias_scale.dtype) * self.weight_scale.detach().to(dtype=self.bias_scale.dtype)
-        epsilon          = torch.finfo(self.bias_scale.dtype).eps
+        """入力scaleとweight scaleからbias scaleを更新する。"""
+        scale = _accumulator_scale(input_scale, self.weight_scale, "QuantBNConv2d")
         with torch.no_grad():
-            self.bias_scale.copy_(scale.clamp_min(epsilon))
-
-
-    def _quantize_bias(self, bias: torch.Tensor) -> torch.Tensor:
-        """fold後のbiasを入力scaleと重みscaleに対応するint32へ量子化する。"""
-        scale   = self.bias_scale.to(device=bias.device, dtype=bias.dtype)
-        scaled  = bias / scale
-        rounded = scaled + (self._round(scaled) - scaled).detach()
-        clipped = torch.clamp(rounded, -(2**31), 2**31 - 1)
-        return clipped * scale
+            self.bias_scale.copy_(scale)
 
 
 
 class QuantLinear(nn.Linear):
-    """重みを出力単位でFake Quantizationする全結合層。"""
+    """重みとbiasをFake Quantizationする全結合層。"""
 
-    def __init__(self, in_features: int, out_features: int, bias: bool = True, weight_bits: int = 8, rounding: str = "ties_away_from_zero") -> None:
+    def __init__(self, in_features: int, out_features: int, bias: bool = True, weight_bits: int = 8, rounding: str = DEFAULT_ROUNDING) -> None:
         super().__init__(in_features, out_features, bias)
         self.weight_quantizer = IntegerQuantizer(bit_width=weight_bits, signed=True, channel_axis=0, channel_size=out_features, rounding=rounding)
+        self._round           = get_rounding_function(rounding)
+        self.register_buffer("bias_scale", torch.ones(out_features, dtype=torch.float32) if bias else None)
+        self.register_buffer("bias_integer", torch.zeros(out_features, dtype=torch.int32) if bias else None)
 
 
-    def forward(self, value: torch.Tensor) -> torch.Tensor:
-        """量子化した重みで全結合演算を行う。"""
+    @property
+    def weight_scale(self) -> torch.Tensor:
+        """出力単位のweight scaleを返す。"""
+        return self.weight_quantizer.scale
+
+
+    def forward(self, value: torch.Tensor, input_scale: torch.Tensor | None = None) -> torch.Tensor:
+        """Fake Quantizationした重みとbiasで全結合演算を行う。"""
         quantized_weight = self.weight_quantizer(self.weight)
-        return F.linear(value, quantized_weight, self.bias)
+        quantized_bias   = self.bias
+        if self.bias is not None and input_scale is not None:
+            self._update_bias_scale(input_scale)
+            quantized_bias = _quantize_int32(self.bias, self.bias_scale, self.bias_integer, self._round)
+        return F.linear(value, quantized_weight, quantized_bias)
+
+
+    def _update_bias_scale(self, input_scale: torch.Tensor) -> None:
+        """入力scaleとweight scaleからbias scaleを更新する。"""
+        scale = _accumulator_scale(input_scale, self.weight_scale, "QuantLinear")
+        with torch.no_grad():
+            self.bias_scale.copy_(scale)
+
+
+def _accumulator_scale(input_scale: torch.Tensor, weight_scale: torch.Tensor, layer_name: str) -> torch.Tensor:
+    """入力scaleとweight scaleからaccumulator scaleを求める。"""
+    flat_input_scale = input_scale.detach().reshape(-1)
+    if flat_input_scale.numel() != 1:
+        raise ValueError(f"{layer_name} requires a per-tensor input scale.")
+    minimum_scale = torch.finfo(weight_scale.dtype).tiny
+    return (flat_input_scale[0].to(device=weight_scale.device, dtype=weight_scale.dtype) * weight_scale.detach()).clamp_min(minimum_scale)
+
+
+def _quantize_int32(value: torch.Tensor, scale: torch.Tensor, integer_buffer: torch.Tensor, round_function: Callable[[torch.Tensor], torch.Tensor]) -> torch.Tensor:
+    """値をint32格子へFake Quantizationして整数値を保存する。"""
+    value_scale   = scale.to(device=value.device, dtype=value.dtype)
+    scaled        = value / value_scale
+    integer_value = round_function(scaled).clamp(-(2**31), 2**31 - 1)
+    rounded       = scaled + (integer_value - scaled).detach()
+    with torch.no_grad():
+        integer_buffer.copy_(integer_value.detach().to(dtype=torch.int32))
+    return rounded * value_scale

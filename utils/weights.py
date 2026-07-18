@@ -27,7 +27,7 @@ def load_model_weight(model: nn.Module, device: torch.device, weight_path: str |
 
     mapped_state, unused_keys = _map_state_dict(model, state_dict)
     incompatible              = model.load_state_dict(mapped_state, strict=False)
-    allowed_missing           = (".scale", ".running_min", ".running_max", ".range_initialized", ".bias_scale")
+    allowed_missing           = (".scale", ".running_min", ".running_max", ".range_initialized", ".bias_scale", ".bias_integer", ".multiplier", ".shift")
     invalid_missing           = [name for name in incompatible.missing_keys if not name.endswith(allowed_missing)]
     unexpected                = sorted(set(unused_keys) | set(incompatible.unexpected_keys))
     if invalid_missing or unexpected:

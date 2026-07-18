@@ -78,7 +78,7 @@ class IntegerQuantizer(nn.Module):
 
     def forward(self, value: torch.Tensor) -> torch.Tensor:
         """STEを使ってFake Quantizationを行う。"""
-        scale   = self._select_scale(value)
+        scale   = self.scale_for(value)
         scaled  = value / scale
         rounded = scaled + (self._round(scaled) - scaled).detach()
         clipped = torch.clamp(rounded, self.qmin, self.qmax)
@@ -88,9 +88,14 @@ class IntegerQuantizer(nn.Module):
     @torch.no_grad()
     def quantize(self, value: torch.Tensor) -> QuantizedTensor:
         """実際の整数値とscaleを返す。"""
-        broadcast_scale = self._select_scale(value)
+        broadcast_scale = self.scale_for(value)
         integer_values  = self._round(value / broadcast_scale).clamp(self.qmin, self.qmax)
         return QuantizedTensor(values=integer_values.to(self._integer_dtype()), scale=self.scale.detach().clone(), zero_point=0)
+
+
+    def scale_for(self, value: torch.Tensor) -> torch.Tensor:
+        """rangeを更新し、valueへbroadcastできるscaleを返す。"""
+        return self._select_scale(value)
 
 
     def _select_scale(self, value: torch.Tensor) -> torch.Tensor:

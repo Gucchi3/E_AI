@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscale、running range、BN fold後のweight scaleとbias scaleはモデルのstate_dictへ保存します。分布可視化observer、整数export、FP4、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscale、running range、整数bias、Q31 multiplier、右shiftはモデルのstate_dictへ保存します。分布可視化observer、C配列export、FP4、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -25,7 +25,11 @@ E_AI/
     ├── engine.py           # 1 epochのtrainとevaluate
     ├── profiling.py        # MACsの計測
     ├── quantization/       # 単独でコピーできる整数QAT部品
-    │   └── batch_norm.py   # BatchNorm fold
+    │   ├── batch_norm.py   # BatchNorm fold
+    │   ├── integer.py      # 整数Fake Quantization
+    │   ├── layers.py       # 量子化ConvとLinear
+    │   ├── requantization.py # Q31再量子化
+    │   └── rounding.py     # 丸め方式
     ├── runtime.py          # seedとdeviceの選択
     ├── weights.py          # 学習済み重みの読込
     └── workflows.py        # 学習全体の組み立て
@@ -64,5 +68,7 @@ E_AI/
 | `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
 | `model_best.pth` | test accuracyが最良だった重み、scale、running rangeを含む`state_dict` |
 | `model_final.pth` | 最終epochの重み、scale、running rangeを含む`state_dict` |
+
+QATモデルでは、整数biasと各Convブロックのsigned int32 `requantizer.multiplier`、int32 `requantizer.shift`も同じ`state_dict`へ保存します。最終Linearの出力scaleは共通化しません。
 
 `training.log`は作りません。モデルファイルはoptimizerやepochを含まないため、resume checkpointではありません。
