@@ -23,6 +23,7 @@ E_AI/
     ├── engine.py           # 1 epochのtrainとevaluate
     ├── profiling.py        # MACsの計測
     ├── runtime.py          # seedとdeviceの選択
+    ├── weights.py          # 学習済み重みの読込
     └── workflows.py        # 学習全体の組み立て
 ```
 
@@ -34,6 +35,7 @@ E_AI/
 - 表示項目名と並びは、実装済みの設定に限ってQ_ViTへ合わせる。
 - epoch結果はRichで項目ごとに色分けし、文字の並びはQ_ViTの簡潔な書式に合わせる。
 - MACsは`thop.profile`で計測する。計測エラーは`N/A`へ変換せず、そのまま表示する。
+- `model.load_weight=true`の場合は、optimizerを作る前に`model.weight_path`のstate_dictを読み込む。
 - best weightの更新や最終weightの保存について独自メッセージを追加しない。
 - 標準`logging`を学習表示へ持ち込まない。
 

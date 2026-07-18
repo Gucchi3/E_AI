@@ -39,7 +39,7 @@ class ModelConfig:
     name        : str
     num_classes : int
     load_weight : bool
-    weight_path: str
+    weight_path : str
 
 
 

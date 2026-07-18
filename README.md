@@ -31,7 +31,22 @@ python main.py --config my_config.json
 - `data.image_size`: `32`または`256`
 - `data.normalization`: CIFAR-10統計を使う`cifar10`、または`[0, 1]`の`zero_one`
 - `data.batch_size`、`data.num_workers`
+- `model.load_weight`: 学習済み重みを読み込む場合は`true`
+- `model.weight_path`: 読み込む`.pth`ファイルのパス
 - `train.epochs`、`train.learning_rate`、`train.weight_decay`、`train.label_smoothing`
+
+学習済み重みを使う場合は、`config.json`を次のように設定します。
+
+```json
+"model": {
+  "name"        : "cifar_cnn",
+  "num_classes" : 10,
+  "load_weight" : true,
+  "weight_path" : "log/20260718_120000/model_best.pth"
+}
+```
+
+raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持つcheckpointを読み込めます。モデル構造と重みの構造は一致している必要があります。
 
 ## 表示
 
