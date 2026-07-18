@@ -1,4 +1,4 @@
-"""JSON configuration loading and validation for the training workflow."""
+"""JSON設定を読み込み、値を検証する。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class RunConfig:
-    """Settings that control one invocation of ``main.py``."""
+    """実行全体の設定。"""
 
     mode   : str
     seed   : int
@@ -18,8 +18,11 @@ class RunConfig:
     log_dir: str
 
 
+
 @dataclass(frozen=True)
 class DataConfig:
+    """データセットの設定。"""
+
     dataset      : str
     root         : str
     image_size   : int
@@ -28,22 +31,31 @@ class DataConfig:
     num_workers  : int
 
 
+
 @dataclass(frozen=True)
 class ModelConfig:
+    """モデルの設定。"""
+
     name       : str
     num_classes: int
 
 
+
 @dataclass(frozen=True)
 class TrainConfig:
+    """学習条件の設定。"""
+
     epochs         : int
     learning_rate  : float
     weight_decay   : float
     label_smoothing: float
 
 
+
 @dataclass(frozen=True)
 class AppConfig:
+    """E_AIの全設定。"""
+
     run  : RunConfig
     data : DataConfig
     model: ModelConfig
@@ -51,7 +63,7 @@ class AppConfig:
 
 
 def load_config(path: str | Path) -> AppConfig:
-    """Load a JSON configuration into validated, immutable settings."""
+    """JSON設定を読み込む。"""
     config_path = Path(path)
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
@@ -74,11 +86,12 @@ def load_config(path: str | Path) -> AppConfig:
     train_config = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
     config       = AppConfig(run=run_config, data=data_config, model=model_config, train=train_config)
     _validate(config)
-    
+
     return config
 
 
 def _section(raw: dict[str, Any], name: str) -> dict[str, Any]:
+    """設定のsectionを取り出す。"""
     value = raw.get(name)
     if not isinstance(value, dict):
         raise ValueError(f"Config section {name!r} must be an object.")
@@ -86,6 +99,7 @@ def _section(raw: dict[str, Any], name: str) -> dict[str, Any]:
 
 
 def _string(raw: dict[str, Any], name: str) -> str:
+    """文字列の設定値を取り出す。"""
     value = raw.get(name)
     if not isinstance(value, str):
         raise ValueError(f"Config value {name!r} must be a string.")
@@ -93,6 +107,7 @@ def _string(raw: dict[str, Any], name: str) -> str:
 
 
 def _integer(raw: dict[str, Any], name: str) -> int:
+    """整数の設定値を取り出す。"""
     value = raw.get(name)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"Config value {name!r} must be an integer.")
@@ -100,6 +115,7 @@ def _integer(raw: dict[str, Any], name: str) -> int:
 
 
 def _number(raw: dict[str, Any], name: str) -> float:
+    """数値の設定値を取り出す。"""
     value = raw.get(name)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"Config value {name!r} must be a number.")
@@ -107,6 +123,7 @@ def _number(raw: dict[str, Any], name: str) -> float:
 
 
 def _validate(config: AppConfig) -> None:
+    """設定値の組み合わせを検証する。"""
     if config.run.mode != "train":
         raise ValueError("Only run.mode='train' is implemented currently.")
     if config.run.device not in {"auto", "cpu", "cuda"}:

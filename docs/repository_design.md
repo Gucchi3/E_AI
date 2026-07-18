@@ -21,6 +21,7 @@ E_AI/
     ├── data.py             # CIFAR-10 transformとDataLoader
     ├── display.py          # Q_ViT準拠のRich表示
     ├── engine.py           # 1 epochのtrainとevaluate
+    ├── profiling.py        # MACsとFLOPsの計測
     ├── runtime.py          # seedとdeviceの選択
     └── workflows.py        # 学習全体の組み立て
 ```
@@ -31,7 +32,8 @@ E_AI/
 
 - 学習設定は`rich.Table`の「Training Configuration」で表示する。
 - 表示項目名と並びは、実装済みの設定に限ってQ_ViTへ合わせる。
-- epoch結果は組み込み`print`でQ_ViTと同じ簡潔な書式にする。
+- epoch結果はRichで項目ごとに色分けし、文字の並びはQ_ViTの簡潔な書式に合わせる。
+- MACsは`thop.profile`で計測し、FLOPsは`MACs × 2`とする。
 - best weightの更新や最終weightの保存について独自メッセージを追加しない。
 - 標準`logging`を学習表示へ持ち込まない。
 
@@ -39,6 +41,8 @@ E_AI/
 
 - 関数定義と関数呼び出しの引数は1行に書く。
 - 関連する代入文が連続する場合は`=`の位置を揃える。
+- 関数の間は2行、クラスの間は3行空ける。クラス内のmethodにも2行の空行を入れる。
+- docstringとコメントは短い日本語で書く。
 - この方針に合わせ、Ruffの行長上限は320文字とする。
 - 機能を追加するときは、現在の責務へ収まるかを先に確認する。
 
@@ -49,9 +53,9 @@ E_AI/
 | ファイル | 内容 |
 | --- | --- |
 | `config.json` | 検証済みの実行設定 |
-| `training_info.json` | device、PyTorch、モデル、入力の基本情報 |
+| `training_info.json` | device、PyTorch、モデル、MACs、FLOPs、入力の基本情報 |
 | `metrics.jsonl` | epochごとのlossとaccuracy |
-| `curves.png` | train/test lossとtest accuracyの曲線 |
+| `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
 | `model_best.pth` | test accuracyが最良だったモデルの`state_dict` |
 | `model_final.pth` | 最終epochのモデルの`state_dict` |
 

@@ -1,8 +1,4 @@
-"""Workflows selected by ``main.py``.
-
-This is the only high-level composition layer. Low-level training utilities do
-not know about command-line modes or artifact file names.
-"""
+"""学習処理を組み立てる。"""
 
 from __future__ import annotations
 
@@ -15,13 +11,14 @@ from model import build_model
 from .artifacts import EpochRecord, RunArtifacts
 from .config import AppConfig
 from .data import make_cifar10_loaders
-from .display import print_training_info
+from .display import print_epoch, print_training_info
 from .engine import evaluate, train_one_epoch
+from .profiling import get_macs_and_flops
 from .runtime import select_device, set_seed
 
 
 def run_train(config: AppConfig) -> None:
-    """Train one model and save self-contained artifacts for that run."""
+    """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
     device                    = select_device(config.run.device)
     train_loader, test_loader = make_cifar10_loaders(config.data, device)
@@ -32,6 +29,7 @@ def run_train(config: AppConfig) -> None:
 
     artifacts       = RunArtifacts.create(config.run.log_dir)
     parameter_count = sum(parameter.numel() for parameter in model.parameters())
+    macs, flops     = get_macs_and_flops(model, device, config.data.image_size)
     artifacts.save_json("config.json", asdict(config))
 
     training_info = {
@@ -39,11 +37,13 @@ def run_train(config: AppConfig) -> None:
         "pytorch_version": torch.__version__,
         "model_name": config.model.name,
         "parameter_count": parameter_count,
+        "macs": macs,
+        "flops": flops,
         "image_size": config.data.image_size,
         "normalization": config.data.normalization,
     }
     artifacts.save_json("training_info.json", training_info)
-    print_training_info(config, model, device, artifacts.run_dir)
+    print_training_info(config, model, device, artifacts.run_dir, macs, flops)
 
     best_accuracy = -1.0
     for epoch in range(1, config.train.epochs + 1):
@@ -52,7 +52,7 @@ def run_train(config: AppConfig) -> None:
         record        = EpochRecord(epoch=epoch, train_loss=train_metrics.loss, train_accuracy=train_metrics.accuracy, test_loss=test_metrics.loss, test_accuracy=test_metrics.accuracy)
         artifacts.record_epoch(record)
         learning_rate = optimizer.param_groups[0]["lr"]
-        print(f"Epoch [{epoch:3d}/{config.train.epochs}]  lr={learning_rate:.2e}  train_loss={record.train_loss:.4f}  test_loss={record.test_loss:.4f}  acc={record.test_accuracy * 100:.2f}%")
+        print_epoch(epoch, config.train.epochs, learning_rate, record.train_loss, record.test_loss, record.test_accuracy)
 
         if record.test_accuracy > best_accuracy:
             best_accuracy = record.test_accuracy

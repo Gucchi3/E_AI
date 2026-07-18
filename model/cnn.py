@@ -1,4 +1,4 @@
-"""A small CNN for CIFAR-10 that accepts 32x32 and 256x256 inputs."""
+"""CIFAR-10用の小さなCNN。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from torch import nn
 
 
 class ConvBlock(nn.Module):
-    """Convolution, batch normalization, and ReLU as one readable unit."""
+    """畳み込み、BatchNorm、ReLUをまとめたブロック。"""
 
     def __init__(self, in_channels: int, out_channels: int, stride: int) -> None:
         super().__init__()
@@ -15,12 +15,15 @@ class ConvBlock(nn.Module):
         self.norm       = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU(inplace=True)
 
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """特徴量を変換する。"""
         return self.activation(self.norm(self.conv(x)))
 
 
+
 class TinyCifarCNN(nn.Module):
-    """Small CIFAR-10 classifier with adaptive pooling for 32 or 256 pixels."""
+    """32×32と256×256の入力に対応する分類モデル。"""
 
     def __init__(self, num_classes: int = 10) -> None:
         super().__init__()
@@ -30,7 +33,9 @@ class TinyCifarCNN(nn.Module):
         self.pool       = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(64, num_classes)
 
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """クラスごとのlogitを返す。"""
         x = self.stem(x)
         x = self.stage1(x)
         x = self.stage2(x)

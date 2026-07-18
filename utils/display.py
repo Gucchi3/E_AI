@@ -1,4 +1,4 @@
-"""Human-readable training information shown once before the first epoch."""
+"""学習状況を見やすく表示する。"""
 
 from __future__ import annotations
 
@@ -7,12 +7,16 @@ from pathlib import Path
 import torch
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from .config import AppConfig
 
 
-def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path) -> None:
-    """Display the active settings with the same Rich table style as Q_ViT."""
+CONSOLE = Console()
+
+
+def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path, macs: str, flops: str) -> None:
+    """学習設定を表形式で表示する。"""
     total_params     = sum(parameter.numel() for parameter in model.parameters())
     trainable_params = sum(parameter.numel() for parameter in model.parameters() if parameter.requires_grad)
     device_name      = _device_name(device)
@@ -32,6 +36,8 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Model", "Num Classes", str(config.model.num_classes))
     table.add_row("Model", "Total Params", f"{total_params:,} ({total_params / 1e6:.2f}M)")
     table.add_row("Model", "Trainable Params", f"{trainable_params:,}")
+    table.add_row("Model", "MACs", macs)
+    table.add_row("Model", "FLOPs", flops)
     table.add_row("")
 
     table.add_row("Data", "Dataset", config.data.dataset.upper())
@@ -49,13 +55,29 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
 
     table.add_row("Output", "Run Directory", str(run_dir))
 
-    console = Console()
-    console.print()
-    console.print(table)
-    console.print()
+    CONSOLE.print()
+    CONSOLE.print(table)
+    CONSOLE.print()
+
+
+def print_epoch(epoch: int, epochs: int, learning_rate: float, train_loss: float, test_loss: float, accuracy: float) -> None:
+    """1 epoch分の結果を色分けして表示する。"""
+    line = Text()
+    line.append("Epoch", style="bold cyan")
+    line.append(f" [{epoch:3d}/{epochs}]  ", style="cyan")
+    line.append("lr", style="bold magenta")
+    line.append(f"={learning_rate:.2e}  ", style="magenta")
+    line.append("train_loss", style="bold yellow")
+    line.append(f"={train_loss:.4f}  ", style="yellow")
+    line.append("test_loss", style="bold blue")
+    line.append(f"={test_loss:.4f}  ", style="blue")
+    line.append("acc", style="bold green")
+    line.append(f"={accuracy * 100:.2f}%", style="green")
+    CONSOLE.print(line)
 
 
 def _device_name(device: torch.device) -> str:
+    """表示用のデバイス名を返す。"""
     if device.type == "cuda":
         return f"cuda ({torch.cuda.get_device_name(device)})"
     return "cpu (CPU)"

@@ -1,4 +1,4 @@
-"""Device selection and reproducible random seeds."""
+"""デバイスと乱数seedを設定する。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import torch
 
 
 def select_device(requested_device: str) -> torch.device:
-    """Resolve the small, explicit device vocabulary from config."""
+    """設定値から実行デバイスを選ぶ。"""
     if requested_device == "cpu":
         return torch.device("cpu")
     if requested_device == "cuda":
@@ -19,7 +19,7 @@ def select_device(requested_device: str) -> torch.device:
 
 
 def set_seed(seed: int) -> None:
-    """Seed Python and PyTorch without introducing global warning filters."""
+    """PythonとPyTorchの乱数seedを揃える。"""
     random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
