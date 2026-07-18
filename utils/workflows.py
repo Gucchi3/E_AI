@@ -29,6 +29,7 @@ def run_train(config: AppConfig) -> None:
 
     train_loader, test_loader = make_cifar10_loaders(config.data, device)
     optimizer                 = torch.optim.AdamW(model.parameters(), lr=config.train.learning_rate, weight_decay=config.train.weight_decay)
+    scheduler                 = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.train.epochs, eta_min=config.train.minimum_learning_rate)
     criterion                 = nn.CrossEntropyLoss(label_smoothing=config.train.label_smoothing)
 
     artifacts       = RunArtifacts.create(config.run.log_dir)
@@ -55,14 +56,15 @@ def run_train(config: AppConfig) -> None:
     for epoch in range(1, config.train.epochs + 1):
         train_metrics = train_one_epoch(model, train_loader, optimizer, criterion, device)
         test_metrics  = evaluate(model, test_loader, criterion, device)
-        record        = EpochRecord(epoch=epoch, train_loss=train_metrics.loss, train_accuracy=train_metrics.accuracy, test_loss=test_metrics.loss, test_accuracy=test_metrics.accuracy)
-        artifacts.record_epoch(record)
         learning_rate = optimizer.param_groups[0]["lr"]
-        print_epoch(epoch, config.train.epochs, learning_rate, record.train_loss, record.test_loss, record.test_accuracy)
+        record        = EpochRecord(epoch=epoch, learning_rate=learning_rate, train_loss=train_metrics.loss, train_accuracy=train_metrics.accuracy, test_loss=test_metrics.loss, test_accuracy=test_metrics.accuracy)
+        artifacts.record_epoch(record)
+        print_epoch(epoch, config.train.epochs, record.learning_rate, record.train_loss, record.test_loss, record.test_accuracy)
 
         if record.test_accuracy > best_accuracy:
             best_accuracy = record.test_accuracy
             artifacts.save_model(model, "model_best.pth")
+        scheduler.step()
 
     artifacts.save_model(model, "model_final.pth")
     print(f"\n{'=' * 60}")

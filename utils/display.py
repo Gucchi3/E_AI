@@ -58,6 +58,8 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Training", "Batch Size", str(config.data.batch_size))
     table.add_row("Training", "Optimizer", "AdamW")
     table.add_row("Training", "LR", str(config.train.learning_rate))
+    table.add_row("Training", "LR Scheduler", "CosineAnnealingLR")
+    table.add_row("Training", "Minimum LR", str(config.train.minimum_learning_rate))
     table.add_row("Training", "Weight Decay", f"{config.train.weight_decay:g}")
     table.add_row("Training", "Label Smooth", f"{config.train.label_smoothing:g}")
     table.add_row("")

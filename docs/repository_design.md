@@ -58,7 +58,7 @@ E_AI/
 | --- | --- |
 | `config.json` | 検証済みの実行設定 |
 | `training_info.json` | device、PyTorch、モデル、MACs、入力の基本情報 |
-| `metrics.jsonl` | epochごとのlossとaccuracy |
+| `metrics.jsonl` | epochごとのlr、loss、accuracy |
 | `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
 | `model_best.pth` | test accuracyが最良だったモデルの`state_dict` |
 | `model_final.pth` | 最終epochのモデルの`state_dict` |

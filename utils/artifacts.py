@@ -20,11 +20,12 @@ from matplotlib import pyplot as plt
 class EpochRecord:
     """1 epoch分の学習結果。"""
 
-    epoch: int
-    train_loss: float
+    epoch         : int
+    learning_rate : float
+    train_loss    : float
     train_accuracy: float
-    test_loss: float
-    test_accuracy: float
+    test_loss     : float
+    test_accuracy : float
 
 
 
