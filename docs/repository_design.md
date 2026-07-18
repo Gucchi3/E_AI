@@ -12,6 +12,7 @@ E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存�
 E_AI/
 ├── main.py                 # configを読み、workflowを選ぶ入口
 ├── config.json             # 学習設定
+├── tools/                  # 単独実行する確認用CLI
 ├── model/
 │   ├── __init__.py         # 明示的なmodel factory
 │   ├── cnn.py              # TinyCifarCNN
@@ -36,6 +37,8 @@ E_AI/
 ```
 
 `utils/quantization/`はPyTorchと同じフォルダ内のmodule以外をimportしません。`model/qat_cnn.py`だけが公開APIの`utils.quantization`を利用します。`utils/engine.py`は任意の`nn.Module`を受け取り、モデル名や保存先を知りません。`utils/workflows.py`だけがmodel、data、engine、artifactを組み合わせます。
+
+`tools/`内のPythonコードはE_AI内のmoduleへ依存させず、各ファイルを直接実行できるCLIにします。学習・評価workflowから呼び出しません。
 
 ## 表示の契約
 

@@ -1,6 +1,6 @@
 # E_AI
 
-Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなCNN学習コードです。FP32学習と基礎的な整数QATに対応しています。入口は`main.py`だけで、設定はJSONへまとめています。
+Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなCNN学習コードです。FP32学習と基礎的な整数QATに対応しています。学習と評価の入口は`main.py`だけで、設定はJSONへまとめています。`tools/`内の確認用コードは各ファイルを直接実行します。
 
 ## セットアップ
 
@@ -28,6 +28,12 @@ python main.py --config my_config.json
 
 ```powershell
 python main.py --config config_qat.json
+```
+
+`.pth`の中身を確認する場合は、確認用コードを直接実行します。
+
+```powershell
+python tools/print_pth.py log/20260719_120000/model_best.pth
 ```
 
 主な設定は次のとおりです。
