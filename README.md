@@ -67,11 +67,11 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 
 ## QAT
 
-`qat_cifar_cnn`は、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みを出力チャンネル単位の整数、biasを入力scaleと重みscaleに対応するint32として量子化します。ConvとLinearは量子化後にdequantizeした浮動小数点Tensorで通常演算し、整数推論処理を混在させません。各Convブロック後だけ、Q31のsigned int32 multiplierとint32右shiftによる再量子化誤差を加えます。丸めの既定値は`ties_away_from_zero`です。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+`qat_cifar_cnn`は、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みを出力チャンネル単位の整数、biasを入力scaleと重みscaleに対応するint32として量子化します。ConvとLinearは量子化後にdequantizeした浮動小数点Tensorで通常演算します。各Convブロック後だけ、PULP-NNと同じ`clip((accumulator × multiplier) >> shift)`による再量子化誤差を加えます。multiplierは量子化重みとbiasから求めたaccumulator上限との積がsigned int32を超えない範囲で選び、右shiftは算術右シフトによる切り捨てです。丸めの既定値`ties_away_from_zero`はFake Quantizationとmultiplier生成に使用します。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
 
 FP32モデルとQATモデルは平均プーリングを使用しません。空間方向は畳み込みで1×1まで変換し、Flatten後に線形層へ入力します。
 
-活性rangeは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scale、running range、整数bias、再量子化のsigned int32 multiplierとint32 shiftは重みと同じ`state_dict`へ保存されるため、`model_best.pth`と`model_final.pth`から復元できます。再量子化parameterは各ブロックの`requantizer.multiplier`と`requantizer.shift`で確認できます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
+活性rangeは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scale、running range、整数bias、accumulator上限、再量子化のsigned int32 multiplierとint32 shiftは重みと同じ`state_dict`へ保存されるため、`model_best.pth`と`model_final.pth`から復元できます。再量子化parameterは各ブロックの`requantizer.multiplier`と`requantizer.shift`で確認できます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
 
 量子化部品は`utils/quantization/`内で完結しており、PyTorch以外のプロジェクト内moduleへ依存しません。scaleは各`IntegerQuantizer`の`scale`、整数値は`quantize()`の結果から取得できます。実装済み機能と保留機能は`utils/quantization/README.md`へ一覧化しています。
 

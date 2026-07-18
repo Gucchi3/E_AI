@@ -2,6 +2,10 @@
 
 作成日: 2026-07-19
 
+## 2026-07-19 PULP式への変更
+
+Q31の仮数正規化を削除し、PULP-NNと同じ`clip((accumulator × multiplier) >> shift)`へ変更した。量子化重み、入力整数範囲、int32 biasからチャンネル別のaccumulator上限を求め、積がsigned int32を超えないmultiplierを選ぶ。multiplierはPULP-NNのint16範囲から選ぶが、multiplier、shift、accumulator上限はいずれもint32 bufferとしてstate_dictへ保存する。以下のQ31に関する記述は変更前の履歴である。
+
 ## 2026-07-19 修正結果
 
 この文書に記録した誤実装は項目ごとに修正した。以下のGit状態と差分概要は修正前の記録として残す。
@@ -168,20 +172,20 @@ accumulator_scale[channel] = input_scale * weight_scale[channel]
 real_multiplier[channel]   = accumulator_scale[channel] / output_scale
 ```
 
-実機では次のような固定小数点演算へ変換する。
+現在の実装では次のPULP式固定小数点演算へ変換する。
 
 ```text
-output_integer = round(accumulator_integer * multiplier / 2^shift)
+output_integer = clip((accumulator_integer * multiplier) >> shift)
 ```
 
-ただし、次を修正・再検討する必要がある。
+実装済みの制約は次のとおり。
 
-- `multiplier`はsigned int32に収める。
+- `multiplier`は1～32767から選び、int32 bufferへ保存する。
 - `shift`もint32で保存・受け渡しする。
-- `multiplier == 2^31`にならない正規化を行う。
-- accumulatorとmultiplierの積をCV32E40Pでどう計算するかを、`mul`、`mulh`など実際の命令列に合わせて別途決める。
+- accumulator上限とmultiplierの積がsigned int32を超える候補は使用しない。
+- CV32E40Pでは通常の`mul`と算術右shiftで処理できる形にする。
 - QAT forwardではdequantize済みTensorによるConv・Linearを維持し、固定小数点誤差を入れる場所だけを再量子化モジュールに限定する。
-- 既定丸め`ties_away_from_zero`を整数右shiftでも同じように適用する。
+- PULP-NNへ合わせ、再量子化の右shiftでは加算丸めを行わない。
 
 ## 「scaleをすべてint32にする」の未決事項
 

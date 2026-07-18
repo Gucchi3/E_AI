@@ -26,6 +26,11 @@ class QuantizedTensor:
 class IntegerQuantizer(nn.Module):
     """指定したビット幅で整数Fake Quantizationを行う。"""
 
+    scale            : torch.Tensor
+    running_min      : torch.Tensor
+    running_max      : torch.Tensor
+    range_initialized: torch.Tensor
+
     def __init__(self, bit_width: int = 8, signed: bool = True, channel_axis: int | None = None, channel_size: int | None = None, rounding: str = "ties_away_from_zero", fixed_scale: float | None = None, range_momentum: float | None = None) -> None:
         super().__init__()
         if bit_width not in SUPPORTED_BIT_WIDTHS:

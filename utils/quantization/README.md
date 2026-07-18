@@ -51,7 +51,7 @@ test_activation = activation_quantizer(test_activation)
 2. 重みはforward時の現在値からチャンネル別scaleを計算する。
 3. 活性は学習中のmin/maxをEMAで更新し、そのrangeからscaleを計算する。
 4. ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算する。
-5. Convブロック後だけ、Q31 multiplierと右shiftによる再量子化誤差を加える。
+5. Convブロック後だけ、PULP式multiplierと右shiftによる再量子化誤差を加える。
 6. 評価時は活性rangeを更新せず、学習中に確定したscaleを使用する。
 7. best/finalモデル保存時は重みとすべての量子化bufferを同じ`state_dict`へ保存する。
 8. checkpoint読込時はscaleとrunning rangeも復元し、QATを継続できる。
@@ -64,15 +64,17 @@ test_activation = activation_quantizer(test_activation)
 
 ## 固定小数点再量子化
 
-`FixedPointRequantizer`は、入力scaleと出力scaleの比率をsigned int32のQ31 multiplierとint32右shiftへ変換します。
+`FixedPointRequantizer`は、入力scaleと出力scaleの比率をPULP式のmultiplierと右shiftへ変換します。
 
 ```text
 real_multiplier = input_scale / output_scale
 real_multiplier ≒ multiplier / 2^shift
-output_integer   = round((input_integer × multiplier) / 2^shift)
+output_integer   = clip((input_integer × multiplier) >> shift)
 ```
 
-forwardでは通常のConvやLinearとは独立してQ31再量子化誤差を加えます。各出力チャンネルの`multiplier`と`shift`はint32 bufferとしてstate_dictへ保存されます。accumulator overflowやCV32E40P上の命令列はまだ模擬しません。
+multiplierは1～32767から選びます。量子化済み重み、入力整数の範囲、int32 biasから出力チャンネルごとのaccumulator上限を計算し、`accumulator上限 × multiplier`がsigned int32を超えない候補だけを使用します。学習中のBatchNorm出力がrunning統計による上限を一時的に超えた場合は、現在のTensorの最大整数値も上限へ含めます。その中から`multiplier / 2^shift`の誤差が最小の候補を選びます。右shiftはPULP-NNと同じ算術右シフトであり、再量子化時の加算丸めは行いません。
+
+forwardでは通常のConvやLinearとは独立してPULP式の再量子化誤差を加えます。各出力チャンネルの`multiplier`と`shift`はint32 bufferとしてstate_dictへ保存されます。`QuantBNConv2d.accumulator_bound`もint32 bufferとして保存され、係数選択とoverflow検査に使用されます。
 
 MAC計測はモデルのコピーで行い、本物のモデルのrunning rangeとBatchNorm統計を変更しません。
 
@@ -102,7 +104,7 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | BatchNorm fold | 実装済み | fold後の重みをper-channel量子化 |
 | fold後biasのint32量子化 | 実装済み | `input_scale * weight_scale`を使用 |
 | Linear biasのint32量子化 | 実装済み | 整数値とscaleをstate_dictへ保存 |
-| Q31整数requantization | 実装済み | multiplierと右shiftをstate_dictへ保存 |
+| PULP式整数requantization | 実装済み | int32積の範囲内でmultiplierを選び、右shiftとともに保存 |
 | Linear出力scaleの共通化 | 保留 | 実機argmaxの比較方式を決めてから実装 |
 | 重み・scaleのC配列export | 保留 | 推論レイアウト確定後に追加 |
 | FP4Quantizer | 保留 | 整数QATの検証後に追加 |
