@@ -68,32 +68,11 @@ def load_config(path: str | Path) -> AppConfig:
     model_raw = _section(raw, "model")
     train_raw = _section(raw, "train")
 
-    config = AppConfig(
-        run=RunConfig(
-            mode    = _string(run_raw, "mode"),
-            seed    = _integer(run_raw, "seed"),
-            device  = _string(run_raw, "device"),
-            log_dir = _string(run_raw, "log_dir"),
-        ),
-        data=DataConfig(
-            dataset       = _string(data_raw, "dataset"),
-            root          = _string(data_raw, "root"),
-            image_size    = _integer(data_raw, "image_size"),
-            normalization = _string(data_raw, "normalization"),
-            batch_size    = _integer(data_raw, "batch_size"),
-            num_workers   = _integer(data_raw, "num_workers"),
-        ),
-        model=ModelConfig(
-            name        = _string(model_raw, "name"),
-            num_classes = _integer(model_raw, "num_classes"),
-        ),
-        train=TrainConfig(
-            epochs          = _integer(train_raw, "epochs"),
-            learning_rate   = _number(train_raw, "learning_rate"),
-            weight_decay    = _number(train_raw, "weight_decay"),
-            label_smoothing = _number(train_raw, "label_smoothing"),
-        ),
-    )
+    run_config   = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
+    data_config  = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
+    model_config = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"))
+    train_config = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
+    config       = AppConfig(run=run_config, data=data_config, model=model_config, train=train_config)
     _validate(config)
     
     return config

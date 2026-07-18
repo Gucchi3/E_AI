@@ -1,4 +1,4 @@
-"""E_AI で使用するモデルの明示的な factory。"""
+"""Explicit model factory used by E_AI."""
 
 from .cnn import TinyCifarCNN
 

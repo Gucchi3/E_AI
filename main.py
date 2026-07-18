@@ -14,16 +14,12 @@ WORKFLOWS: dict[str, Callable[[AppConfig], None]] = {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a tiny CIFAR-10 CNN.")
-    parser.add_argument(
-        "--config",
-        default="config.json",
-        help="Path to a JSON configuration file (default: config.json).",
-    )
+    parser.add_argument("--config", default="config.json", help="Path to a JSON configuration file (default: config.json).")
     return parser.parse_args()
 
 
 def main() -> None:
-    args = parse_args()
+    args   = parse_args()
     config = load_config(args.config)
     WORKFLOWS[config.run.mode](config)
 

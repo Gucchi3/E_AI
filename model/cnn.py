@@ -11,15 +11,8 @@ class ConvBlock(nn.Module):
 
     def __init__(self, in_channels: int, out_channels: int, stride: int) -> None:
         super().__init__()
-        self.conv = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=3,
-            stride=stride,
-            padding=1,
-            bias=False,
-        )
-        self.norm = nn.BatchNorm2d(out_channels)
+        self.conv       = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.norm       = nn.BatchNorm2d(out_channels)
         self.activation = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -31,10 +24,10 @@ class TinyCifarCNN(nn.Module):
 
     def __init__(self, num_classes: int = 10) -> None:
         super().__init__()
-        self.stem = ConvBlock(3, 16, stride=1)
-        self.stage1 = ConvBlock(16, 32, stride=2)
-        self.stage2 = ConvBlock(32, 64, stride=2)
-        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.stem       = ConvBlock(3, 16, stride=1)
+        self.stage1     = ConvBlock(16, 32, stride=2)
+        self.stage2     = ConvBlock(32, 64, stride=2)
+        self.pool       = nn.AdaptiveAvgPool2d(1)
         self.classifier = nn.Linear(64, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
