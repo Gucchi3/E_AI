@@ -20,10 +20,11 @@
     "weight_path" : ""
   },
   "quantization": {
-    "weight_bits"    : 8,
-    "activation_bits": 8,
-    "input_bits"     : 8,
-    "rounding"       : "ties_away_from_zero"
+    "weight_bits"             : 8,
+    "activation_bits"         : 8,
+    "input_bits"              : 8,
+    "rounding"                : "ties_away_from_zero",
+    "activation_range_momentum": 0.95
   },
   "train": {
     "epochs"               : 20,

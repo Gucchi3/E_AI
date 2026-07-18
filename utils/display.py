@@ -47,6 +47,7 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
         table.add_row("Quantization", "Activation Bits", str(config.quantization.activation_bits))
         table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
         table.add_row("Quantization", "Rounding", config.quantization.rounding)
+        table.add_row("Quantization", "Range Momentum", str(config.quantization.activation_range_momentum))
         table.add_row("")
 
     table.add_row("Data", "Dataset", config.data.dataset.upper())

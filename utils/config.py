@@ -47,10 +47,11 @@ class ModelConfig:
 class QuantizationConfig:
     """整数QATの設定。"""
 
-    weight_bits    : int
-    activation_bits: int
-    input_bits     : int
-    rounding       : str
+    weight_bits              : int
+    activation_bits          : int
+    input_bits               : int
+    rounding                 : str
+    activation_range_momentum: float
 
 
 
@@ -93,13 +94,13 @@ def load_config(path: str | Path) -> AppConfig:
     run_raw   = _section(raw, "run")
     data_raw  = _section(raw, "data")
     model_raw = _section(raw, "model")
-    quant_raw = _optional_section(raw, "quantization", {"weight_bits": 8, "activation_bits": 8, "input_bits": 8, "rounding": "ties_away_from_zero"})
+    quant_raw = _optional_section(raw, "quantization", {"weight_bits": 8, "activation_bits": 8, "input_bits": 8, "rounding": "ties_away_from_zero", "activation_range_momentum": 0.95})
     train_raw = _section(raw, "train")
 
     run_config          = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
     data_config         = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
     model_config        = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
-    quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), rounding=_string(quant_raw, "rounding"))
+    quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), rounding=_string(quant_raw, "rounding"), activation_range_momentum=_number_or_default(quant_raw, "activation_range_momentum", 0.95))
     train_config        = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), minimum_learning_rate=_number_or_default(train_raw, "minimum_learning_rate", 0.0), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"))
     config              = AppConfig(run=run_config, data=data_config, model=model_config, quantization=quantization_config, train=train_config)
     _validate(config)
@@ -195,6 +196,8 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("quantization.input_bits must be 8 because image input is uint8.")
     if config.quantization.rounding not in {"ties_away_from_zero", "ties_to_positive", "ties_to_even"}:
         raise ValueError("Unsupported quantization.rounding value.")
+    if not 0.0 <= config.quantization.activation_range_momentum < 1.0:
+        raise ValueError("quantization.activation_range_momentum must be in [0.0, 1.0).")
     if config.model.name == "qat_cifar_cnn" and config.data.normalization != "zero_one":
         raise ValueError("qat_cifar_cnn requires data.normalization='zero_one' for uint8 input.")
     if config.train.epochs <= 0:

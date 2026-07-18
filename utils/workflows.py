@@ -22,7 +22,7 @@ def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
     device = select_device(config.run.device)
-    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding).to(device)
+    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding, config.quantization.activation_range_momentum).to(device)
     if config.model.load_weight:
         weight_path = load_model_weight(model, device, config.model.weight_path)
         print_weight_loaded(weight_path)

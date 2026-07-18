@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。Observer、freeze/unfreeze、FP4、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscaleとrunning rangeはモデルのstate_dictへ保存します。分布可視化observer、BatchNorm fold、整数export、FP4、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -60,7 +60,7 @@ E_AI/
 | `training_info.json` | device、PyTorch、モデル、MACs、入力の基本情報 |
 | `metrics.jsonl` | epochごとのlr、loss、accuracy |
 | `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
-| `model_best.pth` | test accuracyが最良だったモデルの`state_dict` |
-| `model_final.pth` | 最終epochのモデルの`state_dict` |
+| `model_best.pth` | test accuracyが最良だった重み、scale、running rangeを含む`state_dict` |
+| `model_final.pth` | 最終epochの重み、scale、running rangeを含む`state_dict` |
 
 `training.log`は作りません。モデルファイルはoptimizerやepochを含まないため、resume checkpointではありません。

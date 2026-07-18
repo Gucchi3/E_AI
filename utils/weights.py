@@ -25,5 +25,9 @@ def load_model_weight(model: nn.Module, device: torch.device, weight_path: str |
     if not isinstance(state_dict, dict):
         raise ValueError(f"Weight file does not contain a state_dict: {path}")
 
-    model.load_state_dict(state_dict)
+    incompatible    = model.load_state_dict(state_dict, strict=False)
+    allowed_missing = (".scale", ".running_min", ".running_max", ".range_initialized")
+    invalid_missing = [name for name in incompatible.missing_keys if not name.endswith(allowed_missing)]
+    if invalid_missing or incompatible.unexpected_keys:
+        raise RuntimeError(f"Weight structure does not match the model. Missing: {invalid_missing}, unexpected: {incompatible.unexpected_keys}")
     return path
