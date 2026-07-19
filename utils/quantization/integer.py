@@ -26,10 +26,7 @@ class QuantizedTensor:
 class IntegerQuantizer(nn.Module):
     """指定したビット幅で整数Fake Quantizationを行う。"""
 
-    scale            : torch.Tensor
-    running_min      : torch.Tensor
-    running_max      : torch.Tensor
-    range_initialized: torch.Tensor
+    scale: torch.Tensor
 
     def __init__(self, bit_width: int = 8, signed: bool = True, channel_axis: int | None = None, channel_size: int | None = None, rounding: str = "ties_away_from_zero", fixed_scale: float | None = None, range_momentum: float | None = None) -> None:
         super().__init__()
@@ -47,7 +44,7 @@ class IntegerQuantizer(nn.Module):
             raise ValueError("fixed_scale and range_momentum cannot be used together.")
 
         state_size          = channel_size if channel_size is not None else 1
-        initial_scale       = fixed_scale if fixed_scale is not None else 1.0
+        initial_scale       = fixed_scale if fixed_scale is not None else torch.nan
         self.bit_width      = bit_width
         self.signed         = signed
         self.channel_axis   = channel_axis
@@ -58,9 +55,6 @@ class IntegerQuantizer(nn.Module):
         self._round         = get_rounding_function(rounding)
 
         self.register_buffer("scale", torch.full((state_size,), initial_scale, dtype=torch.float32))
-        self.register_buffer("running_min", torch.zeros(state_size, dtype=torch.float32))
-        self.register_buffer("running_max", torch.zeros(state_size, dtype=torch.float32))
-        self.register_buffer("range_initialized", torch.tensor(fixed_scale is not None, dtype=torch.bool))
 
 
     @property
@@ -76,9 +70,15 @@ class IntegerQuantizer(nn.Module):
 
 
     @property
-    def uses_running_range(self) -> bool:
-        """活性rangeの移動平均を使用するか返す。"""
+    def uses_running_scale(self) -> bool:
+        """scaleの移動平均を使用するか返す。"""
         return self.range_momentum is not None
+
+
+    @property
+    def scale_initialized(self) -> bool:
+        """scaleが初期化済みか返す。"""
+        return bool(torch.isfinite(self.scale).all())
 
 
     def forward(self, value: torch.Tensor) -> torch.Tensor:
@@ -108,66 +108,51 @@ class IntegerQuantizer(nn.Module):
         if self.fixed_scale is not None:
             return self._broadcast(self.scale.to(dtype=value.dtype), value.ndim)
 
-        current_min, current_max = self._current_range(value)
-        if self.uses_running_range:
+        current_scale = self._current_scale(value)
+        if self.uses_running_scale:
             if self.training:
-                self._update_running_range(current_min, current_max)
-            elif not bool(self.range_initialized.item()):
-                raise RuntimeError("Running range is not initialized. Run the quantizer in train mode before evaluation.")
-            selected_min = self.running_min
-            selected_max = self.running_max
+                self._update_running_scale(current_scale)
+            elif not self.scale_initialized:
+                raise RuntimeError("Scale is not initialized. Run the quantizer in train mode before evaluation.")
+            selected_scale = self.scale
         else:
-            self._store_current_range(current_min, current_max)
-            selected_min = current_min
-            selected_max = current_max
-
-        selected_scale = self._scale_from_range(selected_min, selected_max)
-        with torch.no_grad():
-            self.scale.copy_(selected_scale)
+            with torch.no_grad():
+                self.scale.copy_(current_scale)
+            selected_scale = current_scale
         return self._broadcast(selected_scale.to(dtype=value.dtype), value.ndim)
 
 
-    def _current_range(self, value: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """現在のTensorから最小値と最大値を求める。"""
+    def _current_scale(self, value: torch.Tensor) -> torch.Tensor:
+        """現在のTensorからscaleを求める。"""
         detached = value.detach()
         if self.channel_axis is None:
-            return detached.amin().reshape(1), detached.amax().reshape(1)
+            minimum = detached.amin().reshape(1)
+            maximum = detached.amax().reshape(1)
+        else:
+            channel_axis      = self.channel_axis % value.ndim
+            reduce_dimensions = tuple(dimension for dimension in range(value.ndim) if dimension != channel_axis)
+            minimum           = detached.amin(dim=reduce_dimensions)
+            maximum           = detached.amax(dim=reduce_dimensions)
 
-        channel_axis      = self.channel_axis % value.ndim
-        reduce_dimensions = tuple(dimension for dimension in range(value.ndim) if dimension != channel_axis)
-        return detached.amin(dim=reduce_dimensions), detached.amax(dim=reduce_dimensions)
-
-
-    def _update_running_range(self, current_min: torch.Tensor, current_max: torch.Tensor) -> None:
-        """Q_ViTと同じ移動平均で活性rangeを更新する。"""
-        with torch.no_grad():
-            current_min = current_min.to(dtype=self.running_min.dtype)
-            current_max = current_max.to(dtype=self.running_max.dtype)
-            if not bool(self.range_initialized.item()):
-                self.running_min.copy_(current_min)
-                self.running_max.copy_(current_max)
-                self.range_initialized.fill_(True)
-                return
-
-            self.running_min.mul_(self.range_momentum).add_(current_min, alpha=1.0 - self.range_momentum)
-            self.running_max.mul_(self.range_momentum).add_(current_max, alpha=1.0 - self.range_momentum)
-
-
-    def _store_current_range(self, current_min: torch.Tensor, current_max: torch.Tensor) -> None:
-        """現在のrangeを保存する。"""
-        with torch.no_grad():
-            self.running_min.copy_(current_min.to(dtype=self.running_min.dtype))
-            self.running_max.copy_(current_max.to(dtype=self.running_max.dtype))
-            self.range_initialized.fill_(True)
-
-
-    def _scale_from_range(self, minimum: torch.Tensor, maximum: torch.Tensor) -> torch.Tensor:
-        """保存したrangeからscaleを計算する。"""
         minimum   = minimum.to(dtype=self.scale.dtype)
         maximum   = maximum.to(dtype=self.scale.dtype)
         magnitude = torch.maximum(minimum.abs(), maximum.abs()) if self.signed else maximum.clamp_min(0.0)
         epsilon   = torch.finfo(self.scale.dtype).eps
         return (magnitude / self.qmax).clamp_min(epsilon)
+
+
+    def _update_running_scale(self, current_scale: torch.Tensor) -> None:
+        """scaleを移動平均で更新する。"""
+        momentum = self.range_momentum
+        if momentum is None:
+            raise RuntimeError("range_momentum is required to update running scale.")
+        with torch.no_grad():
+            current_scale = current_scale.to(dtype=self.scale.dtype)
+            if not self.scale_initialized:
+                self.scale.copy_(current_scale)
+                return
+
+            self.scale.mul_(momentum).add_(current_scale, alpha=1.0 - momentum)
 
 
     def _broadcast(self, value: torch.Tensor, ndim: int) -> torch.Tensor:

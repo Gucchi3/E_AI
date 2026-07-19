@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32と基礎的な整数QATの学習・評価・重み保存を扱います。QATのscale、running range、整数bias、accumulator上限、PULP式multiplier、右shiftはモデルのstate_dictへ保存します。分布可視化observer、C配列export、FP4、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32、整数QAT、FP4 E2M1量子化部品を扱います。QAT中はFake Quantizationを行い、PULP式parameterへの変換は学習後の責務とします。分布可視化observer、C配列export、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -25,8 +25,9 @@ E_AI/
     ├── display.py          # Q_ViT準拠のRich表示
     ├── engine.py           # 1 epochのtrainとevaluate
     ├── profiling.py        # MACsの計測
-    ├── quantization/       # 単独でコピーできる整数QAT部品
+    ├── quantization/       # 単独でコピーできる量子化部品
     │   ├── batch_norm.py   # BatchNorm fold
+    │   ├── fp4.py          # FP4 E2M1 Fake Quantization
     │   ├── integer.py      # 整数Fake Quantization
     │   ├── layers.py       # 量子化ConvとLinear
     │   ├── requantization.py # PULP式再量子化
@@ -69,9 +70,9 @@ E_AI/
 | `training_info.json` | device、PyTorch、モデル、MACs、入力の基本情報 |
 | `metrics.jsonl` | epochごとのlr、loss、accuracy |
 | `curves.png` | latestとbestを凡例に含むlossとaccuracyの曲線 |
-| `model_best.pth` | test accuracyが最良だった重み、scale、running rangeを含む`state_dict` |
-| `model_final.pth` | 最終epochの重み、scale、running rangeを含む`state_dict` |
+| `model_best.pth` | test accuracyが最良だった重みと量子化bufferを含む`state_dict` |
+| `model_final.pth` | 最終epochの重みと量子化bufferを含む`state_dict` |
 
-QATモデルでは、整数bias、accumulator上限、各Convブロックのsigned int32 `requantizer.multiplier`、int32 `requantizer.shift`も同じ`state_dict`へ保存します。multiplierはPULP-NNと同じint16範囲から選びますが、保存時の型はint32です。最終Linearの出力scaleは共通化しません。
+QATモデルでは量子化scale、整数bias、bias scaleを同じ`state_dict`へ保存します。FP4QuantizerはEMA計算途中のrangeを保存せず、最終scaleだけを保存します。最終Linearの出力scaleは共通化しません。
 
 `training.log`は作りません。モデルファイルはoptimizerやepochを含まないため、resume checkpointではありません。

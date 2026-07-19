@@ -29,7 +29,8 @@ def load_model_weight(model: nn.Module, device: torch.device, weight_path: str |
     incompatible              = model.load_state_dict(mapped_state, strict=False)
     allowed_missing           = (".scale", ".running_min", ".running_max", ".range_initialized", ".bias_scale", ".bias_integer", ".accumulator_bound", ".multiplier", ".shift")
     invalid_missing           = [name for name in incompatible.missing_keys if not name.endswith(allowed_missing)]
-    unexpected                = sorted(set(unused_keys) | set(incompatible.unexpected_keys))
+    allowed_unexpected        = (".running_min", ".running_max", ".range_initialized", ".accumulator_bound", ".multiplier", ".shift")
+    unexpected                = sorted(name for name in set(unused_keys) | set(incompatible.unexpected_keys) if not name.endswith(allowed_unexpected))
     if invalid_missing or unexpected:
         raise RuntimeError(f"Weight structure does not match the model. Missing: {invalid_missing}, unexpected: {unexpected}")
     return path
