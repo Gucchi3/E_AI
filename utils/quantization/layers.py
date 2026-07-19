@@ -197,19 +197,25 @@ def _accumulator_scale(input_scale: torch.Tensor, weight_scale: torch.Tensor, la
     flat_input_scale = input_scale.detach().reshape(-1)
     if flat_input_scale.numel() != 1:
         raise ValueError(f"{layer_name} requires a per-tensor input scale.")
+    if not bool(torch.isfinite(flat_input_scale).all()) or bool((flat_input_scale <= 0.0).any()):
+        raise ValueError(f"{layer_name} input_scale must be finite and positive.")
+    if not bool(torch.isfinite(weight_scale).all()) or bool((weight_scale <= 0.0).any()):
+        raise ValueError(f"{layer_name} weight_scale must be finite and positive.")
     minimum_scale = torch.finfo(weight_scale.dtype).tiny
-    return (flat_input_scale[0].to(device=weight_scale.device, dtype=weight_scale.dtype) * weight_scale.detach()).clamp_min(minimum_scale)
+    scale         = flat_input_scale[0].to(device=weight_scale.device, dtype=weight_scale.dtype) * weight_scale.detach()
+    if not bool(torch.isfinite(scale).all()):
+        raise OverflowError(f"{layer_name} bias scale exceeded the floating-point range.")
+    return scale.clamp_min(minimum_scale)
 
 
 def _quantize_int32(value: torch.Tensor, scale: torch.Tensor, integer_buffer: torch.Tensor, round_function: Callable[[torch.Tensor], torch.Tensor]) -> torch.Tensor:
     """値をint32格子へFake Quantizationして整数値を保存する。"""
-    value_scale   = scale.to(device=value.device, dtype=value.dtype)
-    scaled        = value / value_scale
-    integer_value = _integer_int32(value, scale, round_function)
-    rounded       = scaled + (integer_value - scaled).detach()
+    value_scale     = scale.to(device=value.device, dtype=value.dtype)
+    integer_value   = _integer_int32(value, scale, round_function)
+    quantized_value = integer_value.to(dtype=value.dtype) * value_scale
     with torch.no_grad():
         integer_buffer.copy_(integer_value.detach())
-    return rounded * value_scale
+    return value + (quantized_value - value).detach()
 
 
 def _integer_int32(value: torch.Tensor, scale: torch.Tensor, round_function: Callable[[torch.Tensor], torch.Tensor]) -> torch.Tensor:

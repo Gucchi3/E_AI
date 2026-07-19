@@ -117,7 +117,10 @@ class FP4Quantizer(nn.Module):
         if value.ndim == 0 and self.channel_axis is not None:
             raise ValueError("Per-channel quantization requires a Tensor with at least one dimension.")
         if not bool(torch.isfinite(value).all()):
-            raise ValueError("FP4Quantizer input must contain only finite values.")
+            nan_count     = int(torch.isnan(value).sum().item())
+            positive_inf = int(torch.isposinf(value).sum().item())
+            negative_inf = int(torch.isneginf(value).sum().item())
+            raise ValueError(f"FP4Quantizer input contains non-finite values: nan={nan_count}, +inf={positive_inf}, -inf={negative_inf}.")
         if self.channel_axis is not None:
             channel_axis = self.channel_axis % value.ndim
             if value.size(channel_axis) != self.channel_size:
