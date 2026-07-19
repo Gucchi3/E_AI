@@ -30,6 +30,12 @@ python main.py --config my_config.json
 python main.py --config config_qat.json
 ```
 
+先頭と最後の層をINT8、中間層をFP4 E2M1にした混合精度QATモデルは、専用の設定で学習します。
+
+```powershell
+python main.py --config config_mixed_qat.json
+```
+
 `.pth`の中身を確認する場合は、確認用コードを直接実行します。
 
 ```powershell
@@ -86,6 +92,8 @@ FP32モデルとQATモデルは平均プーリングを使用しません。空�
 活性scaleは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scaleと整数biasは重みと同じ`state_dict`へ保存されます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
 
 量子化部品は`utils/quantization/`内で完結しており、整数とFP4 E2M1のFake Quantizationに対応します。`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`は`quantizer`引数で両方式を切り替えます。実装済み機能と保留機能は`utils/quantization/README.md`へ一覧化しています。
+
+`mixed_qat_cifar_cnn`では、最初の畳み込みをINT8入力×INT8重みで計算し、その出力をFP4へ量子化します。中間の畳み込みはFP4入力×FP4重みで計算します。最後の畳み込み出力をINT8へ量子化し、最後の全結合をINT8入力×INT8重みで計算します。biasは各層の入力scaleとweight scaleの積を使うsigned int32です。
 
 学習率は`CosineAnnealingLR`により、`train.learning_rate`から`train.minimum_learning_rate`へ滑らかに低下します。epoch表示の`lr`には、そのepochで実際に使用した値が表示されます。
 

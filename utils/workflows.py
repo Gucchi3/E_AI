@@ -19,6 +19,9 @@ from .runtime import select_device, set_seed
 from .weights import load_model_weight
 
 
+QAT_MODEL_NAMES = {"qat_cifar_cnn", "mixed_qat_cifar_cnn"}
+
+
 def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
@@ -50,7 +53,7 @@ def run_train(config: AppConfig) -> None:
         "macs": macs,
         "image_size": config.data.image_size,
         "normalization": config.data.normalization,
-        "quantization": asdict(config.quantization) if config.model.name == "qat_cifar_cnn" else None,
+        "quantization": asdict(config.quantization) if config.model.name in QAT_MODEL_NAMES else None,
     }
     artifacts.save_json("training_info.json", training_info)
     print_training_info(config, model, device, artifacts.run_dir, macs)

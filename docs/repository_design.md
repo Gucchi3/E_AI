@@ -2,7 +2,7 @@
 
 ## 目的
 
-E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32、整数QAT、FP4 E2M1量子化部品を扱います。QAT中はFake Quantizationを行い、PULP式parameterへの変換は学習後の責務とします。分布可視化observer、C配列export、resume checkpointは実装していません。
+E_AIは、Embedded AI研究向けの小さなCIFAR-10 CNNを、少ない依存関係と明確な責務で学習するプロジェクトです。現在はFP32、整数QAT、先頭・末尾INT8／中間FP4 E2M1の混合精度QATを扱います。QAT中はFake Quantizationを行い、PULP式parameterへの変換は学習後の責務とします。分布可視化observer、C配列export、resume checkpointは実装していません。
 
 すべての実行は`main.py`から開始し、設定は`config.json`で管理します。新しい実行modeを追加するときだけ`utils/workflows.py`と`main.py`の`WORKFLOWS`を拡張します。
 
@@ -16,7 +16,7 @@ E_AI/
 ├── model/
 │   ├── __init__.py         # 明示的なmodel factory
 │   ├── cnn.py              # TinyCifarCNN
-│   └── qat_cnn.py          # TinyQATCNN
+│   └── qat_cnn.py          # TinyQATCNNとTinyMixedQATCNN
 └── utils/
     ├── artifacts.py        # 実行結果、曲線、重みの保存
     ├── augmentation.py     # バッチ単位のMixUpとCutMix

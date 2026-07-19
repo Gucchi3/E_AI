@@ -12,7 +12,8 @@ from rich.text import Text
 from .config import AppConfig
 
 
-CONSOLE = Console()
+CONSOLE         = Console()
+QAT_MODEL_NAMES = {"qat_cifar_cnn", "mixed_qat_cifar_cnn"}
 
 
 def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path, macs: str) -> None:
@@ -42,9 +43,11 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Model", "MACs", macs)
     table.add_row("")
 
-    if config.model.name == "qat_cifar_cnn":
-        table.add_row("Quantization", "Weight Bits", str(config.quantization.weight_bits))
-        table.add_row("Quantization", "Activation Bits", str(config.quantization.activation_bits))
+    if config.model.name in QAT_MODEL_NAMES:
+        weight_format     = "INT8 (first/last), FP4 (middle)" if config.model.name == "mixed_qat_cifar_cnn" else f"INT{config.quantization.weight_bits}"
+        activation_format = "FP4 (middle), INT8 (before final)" if config.model.name == "mixed_qat_cifar_cnn" else f"INT{config.quantization.activation_bits}"
+        table.add_row("Quantization", "Weights", weight_format)
+        table.add_row("Quantization", "Activations", activation_format)
         table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
         table.add_row("Quantization", "Rounding", config.quantization.rounding)
         table.add_row("Quantization", "Range Momentum", str(config.quantization.activation_range_momentum))

@@ -45,7 +45,7 @@ class ModelConfig:
 
 @dataclass(frozen=True)
 class QuantizationConfig:
-    """整数QATの設定。"""
+    """QATの量子化設定。"""
 
     weight_bits              : int
     activation_bits          : int
@@ -186,8 +186,8 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("data.batch_size must be positive.")
     if config.data.num_workers < 0:
         raise ValueError("data.num_workers cannot be negative.")
-    if config.model.name not in {"cifar_cnn", "qat_cifar_cnn"}:
-        raise ValueError("model.name must be 'cifar_cnn' or 'qat_cifar_cnn'.")
+    if config.model.name not in {"cifar_cnn", "qat_cifar_cnn", "mixed_qat_cifar_cnn"}:
+        raise ValueError("model.name must be 'cifar_cnn', 'qat_cifar_cnn', or 'mixed_qat_cifar_cnn'.")
     if config.model.num_classes != 10:
         raise ValueError("CIFAR-10 requires model.num_classes=10.")
     if config.model.load_weight and not config.model.weight_path.strip():
@@ -202,8 +202,12 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("Unsupported quantization.rounding value.")
     if not 0.0 <= config.quantization.activation_range_momentum < 1.0:
         raise ValueError("quantization.activation_range_momentum must be in [0.0, 1.0).")
-    if config.model.name == "qat_cifar_cnn" and config.data.normalization != "zero_one":
-        raise ValueError("qat_cifar_cnn requires data.normalization='zero_one' for uint8 input.")
+    if config.model.name == "mixed_qat_cifar_cnn" and config.quantization.weight_bits != 4:
+        raise ValueError("mixed_qat_cifar_cnn requires quantization.weight_bits=4 for its middle layers.")
+    if config.model.name == "mixed_qat_cifar_cnn" and config.quantization.activation_bits != 4:
+        raise ValueError("mixed_qat_cifar_cnn requires quantization.activation_bits=4 for its middle layers.")
+    if config.model.name in {"qat_cifar_cnn", "mixed_qat_cifar_cnn"} and config.data.normalization != "zero_one":
+        raise ValueError("QAT models require data.normalization='zero_one' for uint8 input.")
     if config.train.epochs <= 0:
         raise ValueError("train.epochs must be positive.")
     if config.train.learning_rate <= 0:
