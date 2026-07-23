@@ -8,6 +8,16 @@ from pathlib import Path
 from typing import Any
 
 
+MODEL_NAMES = frozenset({"cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn"})
+QUANTIZED_MODEL_NAMES = MODEL_NAMES - {"cnn"}
+MODEL_BIT_WIDTHS = {
+    "int8_cnn": 8,
+    "int4_cnn": 4,
+    "fp4_cnn": 4,
+    "mixed_cnn": 4,
+}
+
+
 @dataclass(frozen=True)
 class RunConfig:
     """実行全体の設定。"""
@@ -186,8 +196,8 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("data.batch_size must be positive.")
     if config.data.num_workers < 0:
         raise ValueError("data.num_workers cannot be negative.")
-    if config.model.name not in {"cifar_cnn", "qat_cifar_cnn", "mixed_qat_cifar_cnn"}:
-        raise ValueError("model.name must be 'cifar_cnn', 'qat_cifar_cnn', or 'mixed_qat_cifar_cnn'.")
+    if config.model.name not in MODEL_NAMES:
+        raise ValueError(f"model.name must be one of {sorted(MODEL_NAMES)}.")
     if config.model.num_classes != 10:
         raise ValueError("CIFAR-10 requires model.num_classes=10.")
     if config.model.load_weight and not config.model.weight_path.strip():
@@ -202,12 +212,13 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("Unsupported quantization.rounding value.")
     if not 0.0 <= config.quantization.activation_range_momentum < 1.0:
         raise ValueError("quantization.activation_range_momentum must be in [0.0, 1.0).")
-    if config.model.name == "mixed_qat_cifar_cnn" and config.quantization.weight_bits != 4:
-        raise ValueError("mixed_qat_cifar_cnn requires quantization.weight_bits=4 for its middle layers.")
-    if config.model.name == "mixed_qat_cifar_cnn" and config.quantization.activation_bits != 4:
-        raise ValueError("mixed_qat_cifar_cnn requires quantization.activation_bits=4 for its middle layers.")
-    if config.model.name in {"qat_cifar_cnn", "mixed_qat_cifar_cnn"} and config.data.normalization != "zero_one":
-        raise ValueError("QAT models require data.normalization='zero_one' for uint8 input.")
+    expected_bits = MODEL_BIT_WIDTHS.get(config.model.name)
+    if expected_bits is not None and config.quantization.weight_bits != expected_bits:
+        raise ValueError(f"{config.model.name} requires quantization.weight_bits={expected_bits}.")
+    if expected_bits is not None and config.quantization.activation_bits != expected_bits:
+        raise ValueError(f"{config.model.name} requires quantization.activation_bits={expected_bits}.")
+    if config.model.name in QUANTIZED_MODEL_NAMES and config.data.normalization != "zero_one":
+        raise ValueError("Quantized models require data.normalization='zero_one' for uint8 input.")
     if config.train.epochs <= 0:
         raise ValueError("train.epochs must be positive.")
     if config.train.learning_rate <= 0:

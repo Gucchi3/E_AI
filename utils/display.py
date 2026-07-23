@@ -9,11 +9,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from .config import AppConfig
+from .config import AppConfig, QUANTIZED_MODEL_NAMES
 
 
-CONSOLE         = Console()
-QAT_MODEL_NAMES = {"qat_cifar_cnn", "mixed_qat_cifar_cnn"}
+CONSOLE = Console()
 
 
 def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch.device, run_dir: Path, macs: str) -> None:
@@ -43,9 +42,8 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
     table.add_row("Model", "MACs", macs)
     table.add_row("")
 
-    if config.model.name in QAT_MODEL_NAMES:
-        weight_format     = "INT8 (first/last), FP4 (middle)" if config.model.name == "mixed_qat_cifar_cnn" else f"INT{config.quantization.weight_bits}"
-        activation_format = "FP4 (middle), INT8 (before final)" if config.model.name == "mixed_qat_cifar_cnn" else f"INT{config.quantization.activation_bits}"
+    if config.model.name in QUANTIZED_MODEL_NAMES:
+        weight_format, activation_format = _quantization_formats(config)
         table.add_row("Quantization", "Weights", weight_format)
         table.add_row("Quantization", "Activations", activation_format)
         table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
@@ -110,3 +108,13 @@ def _device_name(device: torch.device) -> str:
     if device.type == "cuda":
         return f"cuda ({torch.cuda.get_device_name(device)})"
     return "cpu (CPU)"
+
+
+def _quantization_formats(config: AppConfig) -> tuple[str, str]:
+    """モデルに対応する重み・活性形式の表示名を返す。"""
+    if config.model.name in {"fp4_cnn", "mixed_cnn"}:
+        return "INT8 (first/last), FP4 (middle)", "FP4 (middle), INT8 (before final)"
+    if config.model.name == "int4_cnn":
+        return "INT8 (first/last), INT4 (middle)", "INT4 (middle), INT8 (before final)"
+    bit_width = config.quantization.weight_bits
+    return f"INT{bit_width}", f"INT{config.quantization.activation_bits}"

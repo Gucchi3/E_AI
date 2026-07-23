@@ -1,9 +1,11 @@
 """利用可能なモデルとモデル生成関数を公開する。"""
 
 from .builder import build_model
-from .tiny_cifar_cnn import TinyCifarCNN
-from .tiny_mixed_qat_cnn import TinyMixedQATCNN
-from .tiny_qat_cnn import TinyQATCNN
+from .cnn import CNN
+from .fp4_cnn import FP4CNN
+from .int4_cnn import Int4CNN
+from .int8_cnn import Int8CNN
+from .mixed_cnn import MixedCNN
 
 
-__all__ = ["TinyCifarCNN", "TinyMixedQATCNN", "TinyQATCNN", "build_model"]
+__all__ = ["CNN", "FP4CNN", "Int4CNN", "Int8CNN", "MixedCNN", "build_model"]

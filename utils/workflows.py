@@ -10,7 +10,7 @@ from torch import nn
 from model import build_model
 from .augmentation import BatchMixupCutmix
 from .artifacts import EpochRecord, RunArtifacts
-from .config import AppConfig
+from .config import AppConfig, QUANTIZED_MODEL_NAMES
 from .data import make_cifar10_loaders
 from .display import print_epoch, print_training_info, print_weight_loaded
 from .engine import evaluate, train_one_epoch
@@ -18,15 +18,11 @@ from .profiling import get_macs
 from .runtime import select_device, set_seed
 from .weights import load_model_weight
 
-
-QAT_MODEL_NAMES = {"qat_cifar_cnn", "mixed_qat_cifar_cnn"}
-
-
 def run_train(config: AppConfig) -> None:
     """学習を実行して結果を保存する。"""
     set_seed(config.run.seed)
     device = select_device(config.run.device)
-    model  = build_model(config.model.name, config.model.num_classes, config.quantization.weight_bits, config.quantization.activation_bits, config.quantization.input_bits, config.quantization.rounding, config.quantization.activation_range_momentum, config.data.image_size).to(device)
+    model  = build_model(name=config.model.name, num_classes=config.model.num_classes, input_bits=config.quantization.input_bits, rounding=config.quantization.rounding, activation_range_momentum=config.quantization.activation_range_momentum, image_size=config.data.image_size).to(device)
     if config.model.load_weight:
         weight_path = load_model_weight(model, device, config.model.weight_path)
         print_weight_loaded(weight_path)
@@ -53,7 +49,7 @@ def run_train(config: AppConfig) -> None:
         "macs": macs,
         "image_size": config.data.image_size,
         "normalization": config.data.normalization,
-        "quantization": asdict(config.quantization) if config.model.name in QAT_MODEL_NAMES else None,
+        "quantization": asdict(config.quantization) if config.model.name in QUANTIZED_MODEL_NAMES else None,
     }
     artifacts.save_json("training_info.json", training_info)
     print_training_info(config, model, device, artifacts.run_dir, macs)

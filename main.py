@@ -15,7 +15,7 @@ WORKFLOWS: dict[str, Callable[[AppConfig], None]] = {
 def parse_args() -> argparse.Namespace:
     """コマンドライン引数を読み取る。"""
     parser = argparse.ArgumentParser(description="CIFAR-10 CNNを学習します。")
-    parser.add_argument("--config", default="config.json", help="設定ファイルのパス。既定値: config.json")
+    parser.add_argument("--config", default="config/cnn.json", help="設定ファイルのパス。既定値: config/cnn.json")
     return parser.parse_args()
 
 

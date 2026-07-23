@@ -9,21 +9,21 @@
     "dataset"      : "cifar10",
     "root"         : "data",
     "image_size"   : 32,
-    "normalization": "cifar10",
+    "normalization": "zero_one",
     "batch_size"   : 128,
     "num_workers"  : 0
   },
   "model": {
-    "name"        : "cifar_cnn",
+    "name"        : "cnn",
     "num_classes" : 10,
     "load_weight" : false,
     "weight_path" : ""
   },
   "quantization": {
-    "weight_bits"             : 8,
-    "activation_bits"         : 8,
-    "input_bits"              : 8,
-    "rounding"                : "ties_away_from_zero",
+    "weight_bits"              : 8,
+    "activation_bits"          : 8,
+    "input_bits"               : 8,
+    "rounding"                 : "ties_away_from_zero",
     "activation_range_momentum": 0.95
   },
   "train": {

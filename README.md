@@ -1,6 +1,6 @@
 # E_AI
 
-Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなCNN学習コードです。FP32学習と基礎的な整数QATに対応しています。学習と評価の入口は`main.py`だけで、設定はJSONへまとめています。`tools/`内の確認用コードは各ファイルを直接実行します。
+Embedded AIの研究に必要な範囲へ絞った、CIFAR-10用の小さなCNN学習コードです。FP32、INT8、INT4、FP4 E2M1、INT8/FP4混合精度の学習に対応しています。学習と評価の入口は`main.py`だけで、設定はJSONへまとめています。`tools/`内の確認用コードは各ファイルを直接実行します。
 
 ## セットアップ
 
@@ -18,34 +18,28 @@ pip install torch torchvision matplotlib rich pretty-errors thop
 python main.py
 ```
 
-別の設定ファイルを使う場合も入口は同じです。
+`python main.py`は既定で`config/cnn.json`を使用します。各モデルの設定は次のコマンドで指定できます。
 
 ```powershell
-python main.py --config my_config.json
+python main.py --config config/cnn.json
+python main.py --config config/int8_cnn.json
+python main.py --config config/int4_cnn.json
+python main.py --config config/fp4_cnn.json
+python main.py --config config/mixed_cnn.json
 ```
 
-小型QATモデルを学習する場合は、付属の設定を指定します。
-
-```powershell
-python main.py --config config_qat.json
-```
-
-先頭と最後の層をINT8、中間層をFP4 E2M1にした混合精度QATモデルは、専用の設定で学習します。
-
-```powershell
-python main.py --config config_mixed_qat.json
-```
+モデル名と実装ファイル、設定ファイルは`cnn`、`int8_cnn`、`int4_cnn`、`fp4_cnn`、`mixed_cnn`で統一しています。
 
 `.pth`の中身を確認する場合は、確認用コードを直接実行します。
 
 ```powershell
-python tools/print_pth.py log/20260719_120000/model_best.pth
+python tools/print_pth.py log/20260722_220608/model_best.pth
 ```
 
 保存時にBNをfoldした重みを整数化し、保存済み整数Tensorと一緒に確認する場合は`--integer`を付けます。
 
 ```powershell
-python tools/print_pth.py log/20260719_120000/model_best.pth --integer
+python tools/print_pth.py log/20260722_220608/model_best.pth --integer
 ```
 
 主な設定は次のとおりです。
@@ -57,8 +51,8 @@ python tools/print_pth.py log/20260719_120000/model_best.pth --integer
 - `data.batch_size`、`data.num_workers`
 - `model.load_weight`: 学習済み重みを読み込む場合は`true`
 - `model.weight_path`: 読み込む`.pth`ファイルのパス
-- `quantization.weight_bits`: 重みの整数bit数。`2`、`4`、`8`、`16`
-- `quantization.activation_bits`: 活性の整数bit数。`2`、`4`、`8`、`16`
+- `quantization.weight_bits`: モデルが使用する重みbit数。INT8は`8`、INT4・FP4・Mixedは`4`
+- `quantization.activation_bits`: モデルが使用する活性bit数。INT8は`8`、INT4・FP4・Mixedは`4`
 - `quantization.input_bits`: `uint8`入力に合わせて現在は`8`
 - `quantization.rounding`: `ties_away_from_zero`、`ties_to_positive`、`ties_to_even`
 - `quantization.activation_range_momentum`: 活性rangeの移動平均。Q_ViTと同じ既定値は`0.95`
@@ -70,14 +64,14 @@ python tools/print_pth.py log/20260719_120000/model_best.pth --integer
 
 MixUpとCutMixはQ_ViTと同じバッチ単位で適用します。学習accuracyは混合比率に応じた期待正解率です。両方を無効にする場合は`mixup_alpha`と`cutmix_alpha`を`0`にします。
 
-FP32モデルから保存したfold済み重みでQATを開始する場合は、`config.json`を次のように設定します。
+FP32モデルから保存したfold済み重みで量子化学習を開始する場合は、対象モデルの設定を次のようにします。付属の量子化モデル用設定はすべてこの読込先を指定しています。
 
 ```json
 "model": {
-  "name"        : "qat_cifar_cnn",
+  "name"        : "int8_cnn",
   "num_classes" : 10,
   "load_weight" : true,
-  "weight_path" : "log/20260718_120000/model_best.pth"
+  "weight_path" : "log/20260722_220608/model_best.pth"
 }
 ```
 
@@ -85,15 +79,20 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 
 ## QAT
 
-`qat_cifar_cnn`は、FP32モデルの保存時にBNをfoldした重みを`QuantConv2d`へ読み込み、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。QATモデル自身はBatchNormを持ちません。fold済みの重みを出力チャンネル単位の整数、biasを`input_scale * weight_scale`に対応するint32として量子化します。ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算します。PULP式multiplierと右shiftへの変換は学習後に行い、QATのforwardには入れません。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+量子化モデルは、FP32モデルの保存時にBNをfoldした重みを`QuantConv2d`へ読み込みます。量子化モデル自身はBatchNormを持ちません。fold済みの重みを出力チャンネル単位、活性をTensor単位でFake Quantizationし、biasは`input_scale * weight_scale`に対応するint32として量子化します。ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算します。PULP式multiplierと右shiftへの変換は学習後に行い、QATのforwardには入れません。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
 
-FP32モデルとQATモデルは平均プーリングを使用しません。空間方向は畳み込みで1×1まで変換し、Flatten後に線形層へ入力します。
+- `int8_cnn`: 重みと活性をINT8で量子化
+- `int4_cnn`: 先頭と末尾をINT8、中間の重みと活性をINT4で量子化
+- `fp4_cnn`: 先頭と末尾をINT8、中間の重みと活性をFP4 E2M1で量子化
+- `mixed_cnn`: 先頭と末尾をINT8、中間をFP4 E2M1で量子化
+
+すべてのConvは3×3です。平均プーリングは使用せず、32×32入力をstride 2のConvで`32→16→8→4`へ縮小し、`64×4×4`をFlattenして線形層へ入力します。
 
 活性scaleは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scaleと整数biasは重みと同じ`state_dict`へ保存されます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
 
 量子化部品は`utils/quantization/`内で完結しており、整数とFP4 E2M1のFake Quantizationに対応します。`QuantConv2d`と`QuantLinear`は`quantizer`引数で両方式を切り替えます。実装済み機能と保留機能は`utils/quantization/README.md`へ一覧化しています。
 
-`mixed_qat_cifar_cnn`では、最初の畳み込みをINT8入力×INT8重みで計算し、その出力をFP4へ量子化します。中間の畳み込みはFP4入力×FP4重みで計算します。最後の畳み込み出力をINT8へ量子化し、最後の全結合をINT8入力×INT8重みで計算します。biasは各層の入力scaleとweight scaleの積を使うsigned int32です。
+`mixed_cnn`では、最初の畳み込みをINT8入力×INT8重みで計算し、その出力をFP4へ量子化します。中間の畳み込みはFP4入力×FP4重みで計算します。最後の畳み込み出力をINT8へ量子化し、最後の全結合をINT8入力×INT8重みで計算します。biasは各層の入力scaleとweight scaleの積を使うsigned int32です。
 
 学習率は`CosineAnnealingLR`により、`train.learning_rate`から`train.minimum_learning_rate`へ滑らかに低下します。epoch表示の`lr`には、そのepochで実際に使用した値が表示されます。
 
