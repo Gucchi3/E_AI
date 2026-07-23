@@ -9,7 +9,7 @@ import torch
 from torch import nn
 from thop import profile
 
-from .quantization import QuantBNConv2d, QuantConv2d, QuantLinear
+from .quantization import QuantConv2d, QuantLinear
 
 
 def get_macs(model: nn.Module, device: torch.device, image_size: int) -> str:
@@ -18,7 +18,7 @@ def get_macs(model: nn.Module, device: torch.device, image_size: int) -> str:
     profile_model.train()
     calibration_input  = torch.rand(2, 3, image_size, image_size, device=device)
     input_tensor       = torch.rand(1, 3, image_size, image_size, device=device)
-    custom_operations  = {QuantBNConv2d: _count_quant_bn_conv, QuantConv2d: _count_quant_conv, QuantLinear: _count_quant_linear}
+    custom_operations  = {QuantConv2d: _count_quant_conv, QuantLinear: _count_quant_linear}
     with warnings.catch_warnings(), torch.no_grad():
         warnings.simplefilter("ignore")
         profile_model(calibration_input)
@@ -26,11 +26,6 @@ def get_macs(model: nn.Module, device: torch.device, image_size: int) -> str:
         macs, _ = profile(profile_model, inputs=(input_tensor,), custom_ops=custom_operations, verbose=False)
 
     return _format_count(macs)
-
-
-def _count_quant_bn_conv(module: QuantBNConv2d, inputs: tuple[torch.Tensor, ...], output: torch.Tensor) -> None:
-    """BN fold対応畳み込みのMAC数を加算する。"""
-    _set_conv_operations(module, module.conv, output)
 
 
 def _count_quant_conv(module: QuantConv2d, inputs: tuple[torch.Tensor, ...], output: torch.Tensor) -> None:

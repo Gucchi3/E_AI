@@ -23,7 +23,7 @@ print(integer_result.scale)
 
 `forward()`はSTEを使うためQATで勾配を計算できます。`quantize()`は推論実装の確認に使う整数値、scale、zero pointを返します。現在のzero pointは常に0です。
 
-重みのscaleをチャンネル単位にする場合は`channel_axis=0`と`channel_size`を指定します。`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`では出力数を`channel_size`として使用しています。重みscaleは現在の重みからforwardごとに計算し、最新値をbufferへ保存します。
+重みのscaleをチャンネル単位にする場合は`channel_axis=0`と`channel_size`を指定します。`QuantConv2d`と`QuantLinear`では出力数を`channel_size`として使用しています。重みscaleは現在の重みからforwardごとに計算し、最新値をbufferへ保存します。
 
 ## FP4量子化
 
@@ -37,7 +37,7 @@ activation_quantizer = FP4Quantizer(range_momentum=0.95)
 convolution          = QuantConv2d(3, 16, kernel_size=3, quantizer="fp4", weight_bits=4)
 ```
 
-整数とFP4は同じ`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`を使用し、`quantizer="integer"`または`quantizer="fp4"`で重みQuantizerを選びます。biasはどちらも`input_scale * weight_scale`をscaleとするsigned int32格子へFake Quantizationします。
+整数とFP4は同じ`QuantConv2d`と`QuantLinear`を使用し、`quantizer="integer"`または`quantizer="fp4"`で重みQuantizerを選びます。biasはどちらも`input_scale * weight_scale`をscaleとするsigned int32格子へFake Quantizationします。
 
 ## 活性scale
 
@@ -61,19 +61,19 @@ test_activation = activation_quantizer(test_activation)
 
 ## 現在のQATフロー
 
-1. 入力は`uint8`に対応する固定scale `1/255`でFake Quantizationする。
-2. 重みはforward時の現在値からチャンネル別scaleを計算する。
-3. 活性は現在のTensorから求めたscaleを学習中にEMAで更新する。
-4. ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算する。
-5. Convブロック後の活性を`IntegerQuantizer`でFake Quantizationする。
-6. 評価時は活性scaleを更新せず、学習中に確定したscaleを使用する。
-7. best/finalモデル保存時は重みと量子化bufferを同じ`state_dict`へ保存する。
-
-`QuantBNConv2d`は学習中にrunning統計を更新しながら、running統計でfoldした重みのFake Quantizationを行います。評価時はBatchNormを重みとbiasへ完全にfoldするため、推論グラフにBatchNorm演算は残りません。fold後のbias scaleは`input_scale * weight_scale`で、int32としてFake Quantizationします。`weight_quantizer.scale`、`bias_integer`、`bias_scale`はstate_dictへ保存されます。
+1. FP32モデルを通常学習し、保存時にPyTorchの`fuse_conv_bn_eval()`でConvとBatchNormを融合する。
+2. BNキーを含まないfold済み`state_dict`を、BatchNormを持たないQATモデルへ読み込む。
+3. 入力は`uint8`に対応する固定scale `1/255`でFake Quantizationする。
+4. 重みはforward時の現在値からチャンネル別scaleを計算する。
+5. 活性は現在のTensorから求めたscaleを学習中にEMAで更新する。
+6. ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算する。
+7. Convブロック後の活性を`IntegerQuantizer`または`FP4Quantizer`でFake Quantizationする。
+8. 評価時は活性scaleを更新せず、学習中に確定したscaleを使用する。
+9. best/finalモデル保存時は重みと量子化bufferを同じ`state_dict`へ保存する。
 
 `QuantConv2d`と`QuantLinear`はbiasを持つ場合に入力scaleを必須とし、入力scaleと出力単位のweight scaleから`bias_scale`を計算します。QATの勾配更新に必要なFP32 master biasとは別に、実機で使用する`bias_integer`と`bias_scale`をbufferとしてstate_dictへ保存します。
 
-学習時のFP32 master weight、BatchNormのbatch統計、損失計算は勾配更新のために残します。PyTorchの`conv2d`と`linear`へ渡すのは、選択した形式へ量子化してからdequantizeした浮動小数点Tensorです。量子化codeを直接ConvやLinearへ渡しません。最終Linearはクラス別scaleのまま実数logitを返し、共通scale化は実機argmaxの仕様を決めるまで行いません。
+学習時のFP32 master weightと損失計算は勾配更新のために残します。PyTorchの`conv2d`と`linear`へ渡すのは、選択した形式へ量子化してからdequantizeした浮動小数点Tensorです。量子化codeを直接ConvやLinearへ渡しません。最終Linearはクラス別scaleのまま実数logitを返し、共通scale化は実機argmaxの仕様を決めるまで行いません。
 
 ## 学習後の固定小数点変換
 
@@ -85,9 +85,9 @@ real_multiplier ≒ multiplier / 2^shift
 output_integer   = clip((input_integer × multiplier) >> shift)
 ```
 
-QAT完了後にBN fold、整数重み・bias生成、accumulator上限計算を行ってから使用します。FP4をCV32E40P向け整数係数へ展開する処理も、この学習後変換の責務です。
+BN foldはQAT開始前のFP32重み保存時に完了します。QAT完了後は整数重み・bias生成、accumulator上限計算を行ってから使用します。FP4をCV32E40P向け整数係数へ展開する処理も、この学習後変換の責務です。
 
-MAC計測はモデルのコピーで行い、本物のモデルの活性scaleとBatchNorm統計を変更しません。
+MAC計測はモデルのコピーで行い、本物のモデルの活性scaleを変更しません。
 
 ## 入力画像
 
@@ -110,10 +110,10 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | scaleのstate_dict保存 | 実装済み | FP4は途中のrangeを保存しない |
 | uint8入力の固定scale | 実装済み | エッジ入力との対応に必要 |
 | MAC計測時の状態保護 | 実装済み | ダミー入力によるscale汚染を防ぐため必要 |
-| 旧checkpointの重み読込 | 実装済み | 量子化bufferがない旧重みからQATを開始するため必要 |
+| fold済みFP32重みの読込 | 実装済み | 量子化bufferがないFP32重みからQATを開始するため必要 |
 | 分布可視化observer | 保留 | 現在のQAT学習には不要 |
 | 手動calibration | 保留 | 学習済みEMAを検証してから追加 |
-| BatchNorm fold | 実装済み | fold後の重みをper-channel量子化 |
+| BatchNorm fold | 実装済み | FP32保存時にPyTorch公式機能でConvへ吸収 |
 | fold後biasのint32量子化 | 実装済み | `input_scale * weight_scale`を使用 |
 | Linear biasのint32量子化 | 実装済み | 整数値とscaleをstate_dictへ保存 |
 | PULP式整数requantization | 変換部品のみ | QAT後の変換で使用する |

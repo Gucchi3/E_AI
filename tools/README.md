@@ -16,7 +16,7 @@ python tools/print_pth.py log/20260719_120000/model_best.pth
 python tools/print_pth.py log/20260719_120000/model_best.pth --full
 ```
 
-量子化重みと保存済みの整数型Tensorだけを表示する場合は`--integer`を付けます。Convの重みはrunning統計でBatchNormをfoldしてから整数へ変換します。重みbit数と丸め方式は`.pth`と同じフォルダの`config.json`から読み込みます。
+量子化重みと保存済みの整数型Tensorだけを表示する場合は`--integer`を付けます。FP32モデルのConvとBatchNormは`.pth`保存時にfold済みであり、このコマンドは保存済みのConv重みを整数へ変換します。重みbit数と丸め方式は`.pth`と同じフォルダの`config.json`から読み込みます。
 
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --integer

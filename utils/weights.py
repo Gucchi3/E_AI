@@ -37,20 +37,12 @@ def load_model_weight(model: nn.Module, device: torch.device, weight_path: str |
 
 
 def _map_state_dict(model: nn.Module, state_dict: dict[str, torch.Tensor]) -> tuple[dict[str, torch.Tensor], list[str]]:
-    """FP32のConv・BNキーをfold対応QATモデルへ対応付ける。"""
+    """同じ名前を持つ重みを読み込み先モデルへ対応付ける。"""
     mapped_state = {}
     used_keys    = set()
     for target_name in model.state_dict():
-        source_name = _fp32_source_name(target_name)
-        for candidate in (target_name, source_name):
-            if candidate in state_dict:
-                mapped_state[target_name] = state_dict[candidate]
-                used_keys.add(candidate)
-                break
+        if target_name in state_dict:
+            mapped_state[target_name] = state_dict[target_name]
+            used_keys.add(target_name)
     unused_keys = [name for name in state_dict if name not in used_keys]
     return mapped_state, unused_keys
-
-
-def _fp32_source_name(target_name: str) -> str:
-    """fold対応QATモデルのキーからFP32モデルのキーを作る。"""
-    return target_name.replace(".conv.conv.", ".conv.").replace(".conv.norm.", ".norm.")

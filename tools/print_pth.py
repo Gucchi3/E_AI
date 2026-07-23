@@ -20,9 +20,8 @@ SUPPORTED_ROUNDING   = ("ties_away_from_zero", "ties_to_positive", "ties_to_even
 class QuantizationSettings:
     """整数重みの生成に使う設定。"""
 
-    weight_bits   : int
-    rounding      : str
-    batch_norm_eps: float
+    weight_bits: int
+    rounding   : str
 
 
 
@@ -58,7 +57,6 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--integer", action="store_true", help="Convert and print quantized weights and stored integer Tensors.")
     parser.add_argument("--weight-bits", type=int, choices=SUPPORTED_BIT_WIDTHS, help="Weight bit width. The adjacent config.json value is used by default.")
     parser.add_argument("--rounding", choices=SUPPORTED_ROUNDING, help="Rounding method. The adjacent config.json value is used by default.")
-    parser.add_argument("--batch-norm-eps", type=float, default=1e-5, help="BatchNorm epsilon used for folding. Default: 1e-5.")
     return parser.parse_args()
 
 
@@ -85,9 +83,7 @@ def _load_quantization_settings(path: Path, arguments: argparse.Namespace) -> Qu
         raise ValueError(f"weight_bits must be one of {SUPPORTED_BIT_WIDTHS}.")
     if rounding not in SUPPORTED_ROUNDING:
         raise ValueError(f"rounding must be one of {SUPPORTED_ROUNDING}.")
-    if arguments.batch_norm_eps <= 0.0:
-        raise ValueError("batch_norm_eps must be positive.")
-    return QuantizationSettings(weight_bits=weight_bits, rounding=rounding, batch_norm_eps=arguments.batch_norm_eps)
+    return QuantizationSettings(weight_bits=weight_bits, rounding=rounding)
 
 
 def _extract_state_dict(checkpoint: Any) -> tuple[str | None, Mapping[str, Any]]:
@@ -107,7 +103,7 @@ def _integer_state_dict(state_dict: Mapping[str, Any], settings: QuantizationSet
     for name, value in state_dict.items():
         if not isinstance(name, str) or not isinstance(value, torch.Tensor):
             continue
-        integer_weight = _quantize_weight(name, value, state_dict, settings)
+        integer_weight = _quantize_weight(name, value, settings)
         if integer_weight is not None:
             integer_name, integer_value = integer_weight
             integer_state[integer_name] = integer_value
@@ -116,34 +112,15 @@ def _integer_state_dict(state_dict: Mapping[str, Any], settings: QuantizationSet
     return integer_state
 
 
-def _quantize_weight(name: str, value: torch.Tensor, state_dict: Mapping[str, Any], settings: QuantizationSettings) -> tuple[str, torch.Tensor] | None:
+def _quantize_weight(name: str, value: torch.Tensor, settings: QuantizationSettings) -> tuple[str, torch.Tensor] | None:
     """量子化層のFP32重みを整数へ変換する。"""
-    if not value.is_floating_point():
+    if not value.is_floating_point() or value.ndim < 2:
         return None
-
-    batch_norm_prefix = _batch_norm_prefix(name, state_dict)
-    if batch_norm_prefix is not None:
-        folded_weight = _fold_batch_norm_weight(value, batch_norm_prefix, state_dict, settings.batch_norm_eps)
-        return _join_name(batch_norm_prefix, "weight_integer"), _integer_weight(folded_weight, settings)
 
     layer_prefix = _layer_prefix(name)
-    if layer_prefix is None or _join_name(layer_prefix, "weight_quantizer.scale") not in state_dict:
+    if layer_prefix is None:
         return None
     return _join_name(layer_prefix, "weight_integer"), _integer_weight(value, settings)
-
-
-def _batch_norm_prefix(name: str, state_dict: Mapping[str, Any]) -> str | None:
-    """Conv+BN量子化層のprefixを返す。"""
-    suffix = ".conv.weight"
-    if not name.endswith(suffix):
-        return None
-    prefix = name[: -len(suffix)]
-    required_names = (
-        _join_name(prefix, "norm.running_mean"),
-        _join_name(prefix, "norm.running_var"),
-        _join_name(prefix, "weight_quantizer.scale"),
-    )
-    return prefix if all(required_name in state_dict for required_name in required_names) else None
 
 
 def _layer_prefix(name: str) -> str | None:
@@ -152,16 +129,6 @@ def _layer_prefix(name: str) -> str | None:
         return ""
     suffix = ".weight"
     return name[: -len(suffix)] if name.endswith(suffix) else None
-
-
-def _fold_batch_norm_weight(weight: torch.Tensor, prefix: str, state_dict: Mapping[str, Any], epsilon: float) -> torch.Tensor:
-    """running統計でBatchNormを重みへfoldする。"""
-    running_var = _required_tensor(state_dict, _join_name(prefix, "norm.running_var")).to(dtype=weight.dtype)
-    norm_weight = state_dict.get(_join_name(prefix, "norm.weight"))
-    gamma       = norm_weight.to(dtype=weight.dtype) if isinstance(norm_weight, torch.Tensor) else torch.ones_like(running_var)
-    scale       = gamma / torch.sqrt(running_var + epsilon)
-    shape       = (weight.size(0),) + (1,) * (weight.ndim - 1)
-    return weight * scale.reshape(shape)
 
 
 def _integer_weight(weight: torch.Tensor, settings: QuantizationSettings) -> torch.Tensor:
@@ -186,14 +153,6 @@ def _round(value: torch.Tensor, rounding: str) -> torch.Tensor:
     if rounding == "ties_to_positive":
         return torch.floor(value + 0.5)
     return torch.round(value)
-
-
-def _required_tensor(state_dict: Mapping[str, Any], name: str) -> torch.Tensor:
-    """state_dictから必須Tensorを取得する。"""
-    value = state_dict.get(name)
-    if not isinstance(value, torch.Tensor):
-        raise ValueError(f"Tensor was not found in state_dict: {name}")
-    return value
 
 
 def _join_name(prefix: str, suffix: str) -> str:

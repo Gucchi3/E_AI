@@ -42,7 +42,7 @@ python main.py --config config_mixed_qat.json
 python tools/print_pth.py log/20260719_120000/model_best.pth
 ```
 
-BNをfoldした整数重みと保存済み整数Tensorだけを確認する場合は`--integer`を付けます。
+保存時にBNをfoldした重みを整数化し、保存済み整数Tensorと一緒に確認する場合は`--integer`を付けます。
 
 ```powershell
 python tools/print_pth.py log/20260719_120000/model_best.pth --integer
@@ -70,28 +70,28 @@ python tools/print_pth.py log/20260719_120000/model_best.pth --integer
 
 MixUpとCutMixはQ_ViTと同じバッチ単位で適用します。学習accuracyは混合比率に応じた期待正解率です。両方を無効にする場合は`mixup_alpha`と`cutmix_alpha`を`0`にします。
 
-学習済み重みを使う場合は、`config.json`を次のように設定します。
+FP32モデルから保存したfold済み重みでQATを開始する場合は、`config.json`を次のように設定します。
 
 ```json
 "model": {
-  "name"        : "cifar_cnn",
+  "name"        : "qat_cifar_cnn",
   "num_classes" : 10,
   "load_weight" : true,
   "weight_path" : "log/20260718_120000/model_best.pth"
 }
 ```
 
-raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持つcheckpointを読み込めます。モデル構造と重みの構造は一致している必要があります。
+raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持つcheckpointを読み込めます。FP32モデルの保存時には、PyTorchの`fuse_conv_bn_eval()`でConvとBatchNormを融合し、BNキーを除いた重みを出力します。このfold済み重みは、同じConvキーを持つQATモデルへ読み込めます。
 
 ## QAT
 
-`qat_cifar_cnn`は、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。畳み込みのBatchNormは推論時に重みとbiasへfoldし、fold後の重みを出力チャンネル単位の整数、biasを`input_scale * weight_scale`に対応するint32として量子化します。ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算します。PULP式multiplierと右shiftへの変換は学習後に行い、QATのforwardには入れません。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
+`qat_cifar_cnn`は、FP32モデルの保存時にBNをfoldした重みを`QuantConv2d`へ読み込み、重みを出力チャンネル単位、ReLU後の活性をTensor単位でFake Quantizationします。QATモデル自身はBatchNormを持ちません。fold済みの重みを出力チャンネル単位の整数、biasを`input_scale * weight_scale`に対応するint32として量子化します。ConvとLinearはdequantize済みのFake Quantization Tensorで通常演算します。PULP式multiplierと右shiftへの変換は学習後に行い、QATのforwardには入れません。入力画像は保存形式と実機では0～255の`uint8`とし、PyTorch内では`ToTensor()`後の0～1へ`scale=1/255`を適用して同じ整数値を模擬します。
 
 FP32モデルとQATモデルは平均プーリングを使用しません。空間方向は畳み込みで1×1まで変換し、Flatten後に線形層へ入力します。
 
 活性scaleは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scaleと整数biasは重みと同じ`state_dict`へ保存されます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
 
-量子化部品は`utils/quantization/`内で完結しており、整数とFP4 E2M1のFake Quantizationに対応します。`QuantConv2d`、`QuantBNConv2d`、`QuantLinear`は`quantizer`引数で両方式を切り替えます。実装済み機能と保留機能は`utils/quantization/README.md`へ一覧化しています。
+量子化部品は`utils/quantization/`内で完結しており、整数とFP4 E2M1のFake Quantizationに対応します。`QuantConv2d`と`QuantLinear`は`quantizer`引数で両方式を切り替えます。実装済み機能と保留機能は`utils/quantization/README.md`へ一覧化しています。
 
 `mixed_qat_cifar_cnn`では、最初の畳み込みをINT8入力×INT8重みで計算し、その出力をFP4へ量子化します。中間の畳み込みはFP4入力×FP4重みで計算します。最後の畳み込み出力をINT8へ量子化し、最後の全結合をINT8入力×INT8重みで計算します。biasは各層の入力scaleとweight scaleの積を使うsigned int32です。
 
@@ -117,7 +117,7 @@ best weightの更新は画面へ出力しません。
 - `training_info.json`: device、PyTorch、モデル、MACs、入力の基本情報
 - `metrics.jsonl`: epochごとのlossとaccuracy
 - `curves.png`: train/test lossとtest accuracyの曲線。accuracyは赤線で、凡例にlatestとbestを表示
-- `model_best.pth`: test accuracyが最良だったモデルの`state_dict`
-- `model_final.pth`: 最終epochのモデルの`state_dict`
+- `model_best.pth`: test accuracyが最良だったモデルの`state_dict`。FP32モデルはBNをConvへfoldして保存
+- `model_final.pth`: 最終epochのモデルの`state_dict`。FP32モデルはBNをConvへfoldして保存
 
 独自のloggerや`training.log`は作りません。分布可視化observer、resume checkpoint拡張などは、必要になるまで含めない方針です。

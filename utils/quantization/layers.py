@@ -9,7 +9,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .batch_norm import batch_norm_scale, fold_batch_norm
 from .fp4 import FP4Quantizer
 from .integer import IntegerQuantizer
 from .rounding import get_rounding_function
@@ -63,75 +62,6 @@ class QuantConv2d(nn.Conv2d):
         if self.bias_scale is None:
             raise RuntimeError("QuantConv2d bias scale is not initialized.")
         scale = _accumulator_scale(input_scale, self.weight_scale, "QuantConv2d")
-        with torch.no_grad():
-            self.bias_scale.copy_(scale)
-
-
-
-class QuantBNConv2d(nn.Module):
-    """BatchNorm fold後の重みとbiasを量子化する畳み込み層。"""
-
-    conv            : nn.Conv2d
-    norm            : nn.BatchNorm2d
-    weight_quantizer: WeightQuantizer
-    bias_scale      : torch.Tensor
-    bias_integer    : torch.Tensor
-
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: Size2d, stride: Size2d = 1, padding: Size2d = 0, bias: bool = False, weight_bits: int = 8, rounding: str = DEFAULT_ROUNDING, batch_norm_eps: float = 1e-5, batch_norm_momentum: float = 0.1, quantizer: QuantizerName = "integer") -> None:
-        super().__init__()
-        self.conv             = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        self.norm             = nn.BatchNorm2d(out_channels, eps=batch_norm_eps, momentum=batch_norm_momentum)
-        self.weight_quantizer = _create_weight_quantizer(quantizer, weight_bits, out_channels, rounding)
-        self._round           = get_rounding_function(rounding)
-        self.register_buffer("bias_scale", torch.ones(out_channels, dtype=torch.float32))
-        self.register_buffer("bias_integer", torch.zeros(out_channels, dtype=torch.int32))
-
-
-    @property
-    def weight_scale(self) -> torch.Tensor:
-        """fold後の重みに使用したチャンネル別scaleを返す。"""
-        return self.weight_quantizer.scale
-
-
-    def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
-        """Fake Quantizationした重みとbiasで畳み込みを行う。"""
-        folded_weight, folded_bias = self.folded_parameters()
-        if self.training:
-            with torch.no_grad():
-                scale = batch_norm_scale(self.norm).detach().to(dtype=self.conv.weight.dtype)
-            weight_shape  = (self.conv.out_channels,) + (1,) * (self.conv.weight.ndim - 1)
-            folded_weight = self.conv.weight * scale.reshape(weight_shape)
-        quantized_weight           = self.weight_quantizer(folded_weight)
-        self._update_bias_scale(input_scale)
-        quantized_bias             = _quantize_int32(folded_bias, self.bias_scale, self.bias_integer, self._round)
-        if self.training:
-            training_weight = self._training_weight(quantized_weight)
-            output = self.conv._conv_forward(value, training_weight, self.conv.bias)
-            return self.norm(output)
-
-        return self.conv._conv_forward(value, quantized_weight, quantized_bias)
-
-
-    def folded_parameters(self) -> tuple[torch.Tensor, torch.Tensor]:
-        """running統計でBatchNormを統合した重みとbiasを返す。"""
-        return fold_batch_norm(self.conv.weight, self.conv.bias, self.norm)
-
-
-    def _training_weight(self, quantized_folded: torch.Tensor) -> torch.Tensor:
-        """fold後に量子化してから学習用の畳み込み重みへ戻す。"""
-        with torch.no_grad():
-            scale = batch_norm_scale(self.norm).detach().to(dtype=self.conv.weight.dtype)
-        weight_shape    = (self.conv.out_channels,) + (1,) * (self.conv.weight.ndim - 1)
-        epsilon         = torch.finfo(self.conv.weight.dtype).eps
-        valid_scale     = scale.abs() > epsilon
-        safe_scale      = torch.where(valid_scale, scale, torch.ones_like(scale))
-        unfolded_weight = quantized_folded / safe_scale.reshape(weight_shape)
-        return torch.where(valid_scale.reshape(weight_shape), unfolded_weight, self.conv.weight)
-
-
-    def _update_bias_scale(self, input_scale: torch.Tensor) -> None:
-        """入力scaleとweight scaleからbias scaleを更新する。"""
-        scale = _accumulator_scale(input_scale, self.weight_scale, "QuantBNConv2d")
         with torch.no_grad():
             self.bias_scale.copy_(scale)
 

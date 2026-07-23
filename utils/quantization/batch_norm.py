@@ -1,33 +1,42 @@
-"""BatchNormを畳み込みの重みとbiasへ統合する。"""
+"""モデル内のBatchNormを直前の畳み込みへ統合する。"""
 
 from __future__ import annotations
 
-import torch
+import copy
+from typing import TypeVar
+
 from torch import nn
+from torch.nn.utils.fusion import fuse_conv_bn_eval
 
 
-def batch_norm_scale(batch_norm: nn.BatchNorm2d) -> torch.Tensor:
-    """BatchNormが各出力チャンネルへ掛ける倍率を返す。"""
-    if batch_norm.running_var is None:
-        raise ValueError("BatchNorm must track running statistics for folding.")
-    weight = batch_norm.weight if batch_norm.weight is not None else torch.ones_like(batch_norm.running_var)
-    return weight / torch.sqrt(batch_norm.running_var + batch_norm.eps)
+ModuleT = TypeVar("ModuleT", bound=nn.Module)
 
 
-def fold_batch_norm(weight: torch.Tensor, bias: torch.Tensor | None, batch_norm: nn.BatchNorm2d) -> tuple[torch.Tensor, torch.Tensor]:
-    """BatchNormを統合した重みとbiasを返す。"""
-    if weight.ndim != 4:
-        raise ValueError("BatchNorm folding requires a four-dimensional convolution weight.")
-    if weight.size(0) != batch_norm.num_features:
-        raise ValueError("The convolution output channels and BatchNorm features must match.")
-    if batch_norm.running_mean is None or batch_norm.running_var is None:
-        raise ValueError("BatchNorm must track running statistics for folding.")
+def fold_batch_norms(model: ModuleT) -> ModuleT:
+    """モデルのコピーをeval modeにし、隣接するConvとBatchNormを融合する。"""
+    folded_model = copy.deepcopy(model)
+    folded_model.eval()
+    _fold_adjacent_modules(folded_model)
+    return folded_model
 
-    running_mean  = batch_norm.running_mean.to(dtype=weight.dtype)
-    scale         = batch_norm_scale(batch_norm).to(dtype=weight.dtype)
-    shift         = batch_norm.bias.to(dtype=weight.dtype) if batch_norm.bias is not None else torch.zeros_like(running_mean)
-    conv_bias     = bias if bias is not None else torch.zeros_like(running_mean)
-    weight_shape  = (weight.size(0),) + (1,) * (weight.ndim - 1)
-    folded_weight = weight * scale.reshape(weight_shape)
-    folded_bias   = shift + (conv_bias - running_mean) * scale
-    return folded_weight, folded_bias
+
+def _fold_adjacent_modules(module: nn.Module) -> None:
+    """子moduleを再帰的に調べ、隣接するConvとBatchNormを置換する。"""
+    children = list(module.named_children())
+    for _, child in children:
+        _fold_adjacent_modules(child)
+
+    for (convolution_name, convolution), (batch_norm_name, batch_norm) in zip(children, children[1:]):
+        if not _is_foldable_pair(convolution, batch_norm):
+            continue
+        setattr(module, convolution_name, fuse_conv_bn_eval(convolution, batch_norm))
+        setattr(module, batch_norm_name, nn.Identity())
+
+
+def _is_foldable_pair(convolution: nn.Module, batch_norm: nn.Module) -> bool:
+    """同じ次元のConvとBatchNormの組み合わせかを返す。"""
+    return (
+        isinstance(convolution, nn.Conv1d) and isinstance(batch_norm, nn.BatchNorm1d)
+        or isinstance(convolution, nn.Conv2d) and isinstance(batch_norm, nn.BatchNorm2d)
+        or isinstance(convolution, nn.Conv3d) and isinstance(batch_norm, nn.BatchNorm3d)
+    )

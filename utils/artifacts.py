@@ -11,6 +11,8 @@ from typing import Any
 import matplotlib
 import torch
 
+from .quantization import fold_batch_norms
+
 matplotlib.use("Agg")
 from matplotlib import pyplot as plt
 
@@ -60,9 +62,10 @@ class RunArtifacts:
 
 
     def save_model(self, model: torch.nn.Module, filename: str) -> Path:
-        """モデルのstate_dictを保存する。"""
-        path = self.run_dir / filename
-        torch.save(model.state_dict(), path)
+        """BatchNormをConvへ吸収したstate_dictを保存する。"""
+        path         = self.run_dir / filename
+        folded_model = fold_batch_norms(model)
+        torch.save(folded_model.state_dict(), path)
         return path
 
 
