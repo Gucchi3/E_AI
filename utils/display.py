@@ -116,6 +116,8 @@ def _quantization_formats(config: AppConfig) -> tuple[str, str]:
         return "INT8 (first/last), FP4 (middle)", "FP4 (middle), INT8 (before final)"
     if config.model.name == "test_cnn":
         return "INT8 (first/last), FP4 (middle)", "UINT4 (middle), INT8 (before final)"
+    if config.model.name == "ufp4_test_cnn":
+        return "INT8 (first/last), FP4 (middle)", "UFP4 E2M2 (middle), INT8 (before final)"
     if config.model.name == "int4_cnn":
         return "INT8 (first/last), INT4 (middle)", "INT4 (middle), INT8 (before final)"
     bit_width = config.quantization.weight_bits

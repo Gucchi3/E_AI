@@ -8,9 +8,10 @@ from .int4_cnn import Int4CNN
 from .int8_cnn import Int8CNN
 from .mixed_cnn import MixedCNN
 from .test_cnn import TestCNN
+from .ufp4_test_cnn import UFP4TestCNN
 
 
-Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN
+Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN
 
 
 def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str = "ties_away_from_zero", activation_range_momentum: float = 0.95, image_size: int = 32) -> Model:
@@ -27,4 +28,6 @@ def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str 
         return MixedCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "test_cnn":
         return TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
-    raise ValueError(f"Unsupported model: {name!r}. Available: ['cnn', 'int8_cnn', 'int4_cnn', 'fp4_cnn', 'mixed_cnn', 'test_cnn']")
+    if name == "ufp4_test_cnn":
+        return UFP4TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    raise ValueError(f"Unsupported model: {name!r}. Available: ['cnn', 'int8_cnn', 'int4_cnn', 'fp4_cnn', 'mixed_cnn', 'test_cnn', 'ufp4_test_cnn']")
