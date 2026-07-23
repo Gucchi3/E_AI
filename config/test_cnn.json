@@ -17,7 +17,7 @@
     "name"        : "test_cnn",
     "num_classes" : 10,
     "load_weight" : true,
-    "weight_path" : "log/20260723_220608/model_best.pth"
+    "weight_path" : "log/20260724_010711/model_best.pth"
   },
   "quantization": {
     "weight_bits"              : 4,
@@ -28,7 +28,7 @@
   },
   "train": {
     "epochs"                    : 50,
-    "learning_rate"             : 5e-4,
+    "learning_rate"             : 5e-5,
     "minimum_learning_rate"     : 5e-7,
     "weight_decay"              : 1e-4,
     "label_smoothing"           : 0.1,
