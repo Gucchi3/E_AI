@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Any
 
 
-MODEL_NAMES = frozenset({"cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn"})
+MODEL_NAMES = frozenset({"cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn", "test_cnn"})
 QUANTIZED_MODEL_NAMES = MODEL_NAMES - {"cnn"}
 MODEL_BIT_WIDTHS = {
     "int8_cnn": 8,
     "int4_cnn": 4,
     "fp4_cnn": 4,
     "mixed_cnn": 4,
+    "test_cnn": 4,
 }
 
 

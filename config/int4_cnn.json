@@ -17,7 +17,7 @@
     "name"        : "int4_cnn",
     "num_classes" : 10,
     "load_weight" : true,
-    "weight_path" : "log/20260722_220608/model_best.pth"
+    "weight_path" : "log/20260723_220608/model_best.pth"
   },
   "quantization": {
     "weight_bits"              : 4,

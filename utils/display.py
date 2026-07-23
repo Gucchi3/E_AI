@@ -114,6 +114,8 @@ def _quantization_formats(config: AppConfig) -> tuple[str, str]:
     """モデルに対応する重み・活性形式の表示名を返す。"""
     if config.model.name in {"fp4_cnn", "mixed_cnn"}:
         return "INT8 (first/last), FP4 (middle)", "FP4 (middle), INT8 (before final)"
+    if config.model.name == "test_cnn":
+        return "INT8 (first/last), FP4 (middle)", "UINT4 (middle), INT8 (before final)"
     if config.model.name == "int4_cnn":
         return "INT8 (first/last), INT4 (middle)", "INT4 (middle), INT8 (before final)"
     bit_width = config.quantization.weight_bits

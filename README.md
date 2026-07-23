@@ -26,20 +26,21 @@ python main.py --config config/int8_cnn.json
 python main.py --config config/int4_cnn.json
 python main.py --config config/fp4_cnn.json
 python main.py --config config/mixed_cnn.json
+python main.py --config config/test_cnn.json
 ```
 
-モデル名と実装ファイル、設定ファイルは`cnn`、`int8_cnn`、`int4_cnn`、`fp4_cnn`、`mixed_cnn`で統一しています。
+モデル名と実装ファイル、設定ファイルは`cnn`、`int8_cnn`、`int4_cnn`、`fp4_cnn`、`mixed_cnn`、`test_cnn`で統一しています。
 
 `.pth`の中身を確認する場合は、確認用コードを直接実行します。
 
 ```powershell
-python tools/print_pth.py log/20260722_220608/model_best.pth
+python tools/print_pth.py log/20260723_220608/model_best.pth
 ```
 
 保存時にBNをfoldした重みを整数化し、保存済み整数Tensorと一緒に確認する場合は`--integer`を付けます。
 
 ```powershell
-python tools/print_pth.py log/20260722_220608/model_best.pth --integer
+python tools/print_pth.py log/20260723_220608/model_best.pth --integer
 ```
 
 主な設定は次のとおりです。
@@ -71,7 +72,7 @@ FP32モデルから保存したfold済み重みで量子化学習を開始する
   "name"        : "int8_cnn",
   "num_classes" : 10,
   "load_weight" : true,
-  "weight_path" : "log/20260722_220608/model_best.pth"
+  "weight_path" : "log/20260723_220608/model_best.pth"
 }
 ```
 
@@ -85,6 +86,7 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 - `int4_cnn`: 先頭と末尾をINT8、中間の重みと活性をINT4で量子化
 - `fp4_cnn`: 先頭と末尾をINT8、中間の重みと活性をFP4 E2M1で量子化
 - `mixed_cnn`: 先頭と末尾をINT8、中間をFP4 E2M1で量子化
+- `test_cnn`: 先頭と末尾をINT8、中間をUINT4活性×FP4 E2M1重みで量子化
 
 すべてのConvは3×3です。平均プーリングは使用せず、32×32入力をstride 2のConvで`32→16→8→4`へ縮小し、`64×4×4`をFlattenして線形層へ入力します。
 

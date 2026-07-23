@@ -23,6 +23,11 @@ class BlockQuantization:
     activation_bits     : int
 
 
+def fp4_weight_uint4_activation() -> BlockQuantization:
+    """FP4重みとunsigned INT4出力活性を組み合わせた設定を返す。"""
+    return BlockQuantization(weight_quantizer="fp4", activation_quantizer="integer", weight_bits=4, activation_bits=4)
+
+
 class QuantConvBlock(nn.Module):
     """BN吸収済み重みを使用する量子化畳み込みと活性量子化をまとめる。"""
 

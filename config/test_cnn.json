@@ -14,7 +14,7 @@
     "num_workers"  : 8
   },
   "model": {
-    "name"        : "fp4_cnn",
+    "name"        : "test_cnn",
     "num_classes" : 10,
     "load_weight" : true,
     "weight_path" : "log/20260723_220608/model_best.pth"
