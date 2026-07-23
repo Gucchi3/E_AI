@@ -39,6 +39,10 @@ convolution          = QuantConv2d(3, 16, kernel_size=3, quantizer="fp4", weight
 
 整数とFP4は同じ`QuantConv2d`と`QuantLinear`を使用し、`quantizer="integer"`または`quantizer="fp4"`で重みQuantizerを選びます。biasはどちらも`input_scale * weight_scale`をscaleとするsigned int32格子へFake Quantizationします。
 
+## UFP4量子化
+
+`UFP4Quantizer`は符号なしE2M2形式の`0`、`0.25`、`0.5`、`0.75`、`1`、`1.25`、`1.5`、`1.75`、`2`、`2.5`、`3`、`3.5`、`4`、`5`、`6`、`7`へFake Quantizationします。負値は0へclipし、ReLU後の活性に使用します。scaleのEMA、4bit codeを返す`quantize()`、復元する`dequantize()`は`FP4Quantizer`と同じAPIです。UFP4は重みQuantizerには使用しません。
+
 ## 活性scale
 
 活性Quantizerではscaleを移動平均で更新します。既定の`range_momentum=0.95`では、現在のscaleを5%、以前のscaleを95%として使用します。
@@ -103,6 +107,7 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | --- | --- | --- |
 | INT2/4/8/16 Fake Quantization | 実装済み | QATの基礎として必要 |
 | FP4 E2M1 Fake Quantization | 実装済み | 3種類の共通丸めとscale EMAに対応 |
+| UFP4 E2M2 Fake Quantization | 実装済み | ReLU後の符号なし活性、3種類の共通丸めとscale EMAに対応 |
 | ties-away-from-zero丸め | 実装済み | CV32E40P向けの丸め一致に必要 |
 | 重みのチャンネル別scale | 実装済み | ConvとLinearの重み量子化に必要 |
 | 活性scaleのEMA | 実装済み | 安定したQATに必要 |

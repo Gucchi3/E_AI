@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 import torch
 from torch import nn
 
-from utils.quantization import FP4Quantizer, IntegerQuantizer, QuantConv2d, QuantizerName
+from utils.quantization import FP4Quantizer, IntegerQuantizer, QuantConv2d, QuantizerName, UFP4Quantizer
 
 
-ActivationQuantizer = IntegerQuantizer | FP4Quantizer
+ActivationQuantizerName = Literal["integer", "fp4", "ufp4"]
+ActivationQuantizer     = IntegerQuantizer | FP4Quantizer | UFP4Quantizer
 
 
 @dataclass(frozen=True)
@@ -18,7 +20,7 @@ class BlockQuantization:
     """畳み込み重みと出力活性の量子化設定。"""
 
     weight_quantizer    : QuantizerName
-    activation_quantizer: QuantizerName
+    activation_quantizer: ActivationQuantizerName
     weight_bits         : int
     activation_bits     : int
 
@@ -26,6 +28,11 @@ class BlockQuantization:
 def fp4_weight_uint4_activation() -> BlockQuantization:
     """FP4重みとunsigned INT4出力活性を組み合わせた設定を返す。"""
     return BlockQuantization(weight_quantizer="fp4", activation_quantizer="integer", weight_bits=4, activation_bits=4)
+
+
+def fp4_weight_ufp4_activation() -> BlockQuantization:
+    """FP4重みとUFP4 E2M2出力活性を組み合わせた設定を返す。"""
+    return BlockQuantization(weight_quantizer="fp4", activation_quantizer="ufp4", weight_bits=4, activation_bits=4)
 
 
 class QuantConvBlock(nn.Module):
@@ -54,4 +61,8 @@ def _create_activation_quantizer(quantization: BlockQuantization, rounding: str,
         if quantization.activation_bits != 4:
             raise ValueError("FP4 activation_bits must be 4.")
         return FP4Quantizer(rounding=rounding, range_momentum=range_momentum)
+    if quantization.activation_quantizer == "ufp4":
+        if quantization.activation_bits != 4:
+            raise ValueError("UFP4 activation_bits must be 4.")
+        return UFP4Quantizer(rounding=rounding, range_momentum=range_momentum)
     raise ValueError(f"Unsupported activation quantizer: {quantization.activation_quantizer!r}.")
