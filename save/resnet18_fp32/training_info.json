@@ -1,0 +1,12 @@
+{
+  "device": "cuda",
+  "pytorch_version": "2.13.0+cu130",
+  "model_name": "resnet18_fp32",
+  "parameter_count": 11173962,
+  "load_weight": false,
+  "weight_path": "",
+  "macs": "557,889,024 (557.89M)",
+  "image_size": 32,
+  "normalization": "zero_one",
+  "quantization": null
+}
