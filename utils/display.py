@@ -118,7 +118,7 @@ def _quantization_formats(config: AppConfig) -> tuple[str, str]:
         return "INT8 (stem/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), FP4 E2M1 (signed branches), UINT8 (average pool)"
     if config.model.name in {"resnet18_int4", "mobilenet_v2_int4"}:
         return "INT8 (stem/classifier), INT4 (body)", "INT4 (body), UINT8 (average pool)"
-    if config.model.name in {"resnet18_int8", "mobilenet_v2_int8"}:
+    if config.model.name in {"basic_vit_int8", "resnet18_int8", "mobilenet_v2_int8"}:
         return "INT8", "INT8"
     if config.model.name in {"fp4_cnn", "mixed_cnn"}:
         return "INT8 (first/last), FP4 (middle)", "FP4 (middle), INT8 (before final)"

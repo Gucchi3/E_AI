@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Any
 
 
-MODEL_NAMES = frozenset({"cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn", "test_cnn", "ufp4_test_cnn", "resnet18_fp32", "resnet18_int8", "resnet18_int4", "resnet18_fp4", "resnet18_ufp4", "mobilenet_v2_fp32", "mobilenet_v2_int8", "mobilenet_v2_int4", "mobilenet_v2_fp4", "mobilenet_v2_ufp4"})
-FP32_MODEL_NAMES = frozenset({"cnn", "resnet18_fp32", "mobilenet_v2_fp32"})
+MODEL_NAMES = frozenset({"basic_vit_fp32", "basic_vit_int8", "cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn", "test_cnn", "ufp4_test_cnn", "resnet18_fp32", "resnet18_int8", "resnet18_int4", "resnet18_fp4", "resnet18_ufp4", "mobilenet_v2_fp32", "mobilenet_v2_int8", "mobilenet_v2_int4", "mobilenet_v2_fp4", "mobilenet_v2_ufp4"})
+FP32_MODEL_NAMES = frozenset({"basic_vit_fp32", "cnn", "resnet18_fp32", "mobilenet_v2_fp32"})
 QUANTIZED_MODEL_NAMES = MODEL_NAMES - FP32_MODEL_NAMES
 MODEL_BIT_WIDTHS = {
+    "basic_vit_int8": 8,
     "int8_cnn": 8,
     "int4_cnn": 4,
     "fp4_cnn": 4,
