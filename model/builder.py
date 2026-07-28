@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from .basic_vit import BasicViTFP32, BasicViTINT8
 from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
 from .MobileNet_v2 import MobileNetV2FP4, MobileNetV2FP32, MobileNetV2INT4, MobileNetV2INT8, MobileNetV2UFP4
 from .ResNet18 import ResNet18FP4, ResNet18FP32, ResNet18INT4, ResNet18INT8, ResNet18UFP4
 
 
-Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | ResNet18INT8 | ResNet18INT4 | ResNet18FP4 | ResNet18UFP4 | MobileNetV2FP32 | MobileNetV2INT8 | MobileNetV2INT4 | MobileNetV2FP4 | MobileNetV2UFP4
+Model = BasicViTFP32 | BasicViTINT8 | CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | ResNet18INT8 | ResNet18INT4 | ResNet18FP4 | ResNet18UFP4 | MobileNetV2FP32 | MobileNetV2INT8 | MobileNetV2INT4 | MobileNetV2FP4 | MobileNetV2UFP4
 
 AVAILABLE_MODELS = (
+    "basic_vit_fp32",
+    "basic_vit_int8",
     "cnn",
     "int8_cnn",
     "int4_cnn",
@@ -32,6 +35,10 @@ AVAILABLE_MODELS = (
 
 def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str = "ties_away_from_zero", activation_range_momentum: float = 0.95, image_size: int = 32) -> Model:
     """指定されたモデルを生成する。"""
+    if name == "basic_vit_fp32":
+        return BasicViTFP32(num_classes=num_classes, image_size=image_size)
+    if name == "basic_vit_int8":
+        return BasicViTINT8(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "cnn":
         return CNN(num_classes=num_classes, image_size=image_size)
     if name == "int8_cnn":
