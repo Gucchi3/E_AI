@@ -27,7 +27,7 @@
     "activation_range_momentum": 0.95
   },
   "train": {
-    "epochs"                    : 20,
+    "epochs"                    : 300,
     "learning_rate"             : 0.001,
     "minimum_learning_rate"     : 0.00001,
     "weight_decay"              : 0.0001,
