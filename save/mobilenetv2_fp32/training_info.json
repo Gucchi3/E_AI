@@ -1,0 +1,12 @@
+{
+  "device": "cuda",
+  "pytorch_version": "2.13.0+cu130",
+  "model_name": "mobilenet_v2_fp32",
+  "parameter_count": 2236682,
+  "load_weight": false,
+  "weight_path": "",
+  "macs": "26,648,320 (26.65M)",
+  "image_size": 32,
+  "normalization": "zero_one",
+  "quantization": null
+}
