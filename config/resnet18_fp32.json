@@ -14,7 +14,7 @@
     "num_workers"  : 8
   },
   "model": {
-    "name"        : "resnet16_fp32",
+    "name"        : "resnet18_fp32",
     "num_classes" : 10,
     "load_weight" : false,
     "weight_path" : ""

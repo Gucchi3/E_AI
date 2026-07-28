@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
 from .MobileNet_v2 import MobileNetV2FP32
-from .ResNet16 import ResNet16FP32
+from .ResNet18 import ResNet18FP32
 
 
-Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet16FP32 | MobileNetV2FP32
+Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | MobileNetV2FP32
 
 AVAILABLE_MODELS = (
     "cnn",
@@ -17,7 +17,7 @@ AVAILABLE_MODELS = (
     "mixed_cnn",
     "test_cnn",
     "ufp4_test_cnn",
-    "resnet16_fp32",
+    "resnet18_fp32",
     "mobilenet_v2_fp32",
 )
 
@@ -38,8 +38,8 @@ def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str 
         return TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "ufp4_test_cnn":
         return UFP4TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
-    if name == "resnet16_fp32":
-        return ResNet16FP32(num_classes=num_classes, image_size=image_size)
+    if name == "resnet18_fp32":
+        return ResNet18FP32(num_classes=num_classes, image_size=image_size)
     if name == "mobilenet_v2_fp32":
         return MobileNetV2FP32(num_classes=num_classes, image_size=image_size)
     raise ValueError(f"Unsupported model: {name!r}. Available: {list(AVAILABLE_MODELS)}")

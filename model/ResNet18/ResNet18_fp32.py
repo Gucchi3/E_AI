@@ -1,4 +1,4 @@
-"""FP32 ResNet-16 adapted to 32x32 CIFAR-10 images."""
+"""FP32 ResNet-18 adapted to 32x32 CIFAR-10 images."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from torch import nn
 
 
 class BasicBlock(nn.Module):
-    """Two-convolution residual block used by the CIFAR ResNet-16."""
+    """Two-convolution residual block used by ResNet-18."""
 
     expansion = 1
 
@@ -32,27 +32,22 @@ class BasicBlock(nn.Module):
         return self.relu2(value + identity)
 
 
-class ResNet16FP32(nn.Module):
-    """CIFAR ResNet-16 with six basic blocks and no initial downsampling.
-
-    The network uses two blocks in each 16/32/64-channel stage. Its depth is
-    counted as 16 parameterized layers when the two projection shortcuts are
-    included: 1 stem convolution, 12 block convolutions, 2 projections, and
-    1 classifier.
-    """
+class ResNet18FP32(nn.Module):
+    """CIFAR-10-adapted ResNet-18 with a stride-1 stem and no max pooling."""
 
     def __init__(self, num_classes: int = 10, image_size: int = 32) -> None:
         super().__init__()
         if image_size != 32:
-            raise ValueError("ResNet16FP32 is adapted specifically for 32x32 CIFAR images.")
+            raise ValueError("ResNet18FP32 is adapted specifically for 32x32 CIFAR images.")
 
-        self.in_channels = 16
-        self.stem       = nn.Sequential(nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False), nn.BatchNorm2d(16), nn.ReLU(inplace=True))
-        self.stage1     = self._make_stage(out_channels=16, block_count=2, stride=1)
-        self.stage2     = self._make_stage(out_channels=32, block_count=2, stride=2)
-        self.stage3     = self._make_stage(out_channels=64, block_count=2, stride=2)
+        self.in_channels = 64
+        self.stem       = nn.Sequential(nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False), nn.BatchNorm2d(64), nn.ReLU(inplace=True))
+        self.stage1     = self._make_stage(out_channels=64, block_count=2, stride=1)
+        self.stage2     = self._make_stage(out_channels=128, block_count=2, stride=2)
+        self.stage3     = self._make_stage(out_channels=256, block_count=2, stride=2)
+        self.stage4     = self._make_stage(out_channels=512, block_count=2, stride=2)
         self.pool       = nn.AdaptiveAvgPool2d((1, 1))
-        self.classifier = nn.Linear(64, num_classes)
+        self.classifier = nn.Linear(512, num_classes)
 
         self._initialize_weights()
 
@@ -78,6 +73,7 @@ class ResNet16FP32(nn.Module):
         value = self.stage1(value)
         value = self.stage2(value)
         value = self.stage3(value)
+        value = self.stage4(value)
         value = self.pool(value)
         value = torch.flatten(value, start_dim=1)
         return self.classifier(value)
