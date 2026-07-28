@@ -18,18 +18,26 @@ pip install torch torchvision matplotlib rich pretty-errors thop
 python main.py
 ```
 
-`python main.py`は既定で`config/cnn.json`を使用します。各モデルの設定は次のコマンドで指定できます。
+`python main.py`は既定で`config/basic_cnn/cnn.json`を使用します。各モデルの設定は次のコマンドで指定できます。
 
 ```powershell
-python main.py --config config/cnn.json
-python main.py --config config/int8_cnn.json
-python main.py --config config/int4_cnn.json
-python main.py --config config/fp4_cnn.json
-python main.py --config config/mixed_cnn.json
-python main.py --config config/test_cnn.json
-python main.py --config config/ufp4_test_cnn.json
-python main.py --config config/resnet18_fp32.json
-python main.py --config config/mobilenet_v2_fp32.json
+python main.py --config config/basic_cnn/cnn.json
+python main.py --config config/basic_cnn/int8_cnn.json
+python main.py --config config/basic_cnn/int4_cnn.json
+python main.py --config config/basic_cnn/fp4_cnn.json
+python main.py --config config/basic_cnn/mixed_cnn.json
+python main.py --config config/basic_cnn/test_cnn.json
+python main.py --config config/basic_cnn/ufp4_test_cnn.json
+python main.py --config config/ResNet18/resnet18_fp32.json
+python main.py --config config/ResNet18/resnet18_int8.json
+python main.py --config config/ResNet18/resnet18_int4.json
+python main.py --config config/ResNet18/resnet18_fp4.json
+python main.py --config config/ResNet18/resnet18_ufp4.json
+python main.py --config config/MobileNet_v2/mobilenet_v2_fp32.json
+python main.py --config config/MobileNet_v2/mobilenet_v2_int8.json
+python main.py --config config/MobileNet_v2/mobilenet_v2_int4.json
+python main.py --config config/MobileNet_v2/mobilenet_v2_fp4.json
+python main.py --config config/MobileNet_v2/mobilenet_v2_ufp4.json
 ```
 
 `resnet18_fp32`は3×3・stride 1のstemとmax poolingなしで32×32入力へ適応したResNet-18、`mobilenet_v2_fp32`はstemのstrideだけを1へ変更したCIFAR-10向けMobileNetV2です。既存のCNN系モデルは`model/basic_cnn/`、ResNet-18は`model/ResNet18/`、MobileNetV2は`model/MobileNet_v2/`に整理しています。

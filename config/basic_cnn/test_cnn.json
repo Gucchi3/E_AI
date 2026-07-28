@@ -1,0 +1,40 @@
+{
+  "run": {
+    "mode": "train",
+    "seed"   : 0,
+    "device" : "auto",
+    "log_dir": "log"
+  },
+  "data": {
+    "dataset"      : "cifar10",
+    "root"         : "data",
+    "image_size"   : 32,
+    "normalization": "zero_one",
+    "batch_size"   : 128,
+    "num_workers"  : 8
+  },
+  "model": {
+    "name"        : "test_cnn",
+    "num_classes" : 10,
+    "load_weight" : true,
+    "weight_path" : "log/20260724_010711/model_best.pth"
+  },
+  "quantization": {
+    "weight_bits"              : 4,
+    "activation_bits"          : 4,
+    "input_bits"               : 8,
+    "rounding"                 : "ties_away_from_zero",
+    "activation_range_momentum": 0.95
+  },
+  "train": {
+    "epochs"                    : 50,
+    "learning_rate"             : 5e-5,
+    "minimum_learning_rate"     : 5e-7,
+    "weight_decay"              : 1e-4,
+    "label_smoothing"           : 0.1,
+    "mixup_alpha"               : 0.8,
+    "cutmix_alpha"              : 1.0,
+    "mixup_probability"         : 1.0,
+    "mixup_switch_probability"  : 0.5
+  }
+}
