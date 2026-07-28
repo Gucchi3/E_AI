@@ -47,6 +47,8 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
         table.add_row("Quantization", "Weights", weight_format)
         table.add_row("Quantization", "Activations", activation_format)
         table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
+        if config.model.name in {"basic_vit_int8", "basic_vit_int4", "basic_vit_fp4", "basic_vit_ufp4"}:
+            table.add_row("Quantization", "Residual", f"INT{config.quantization.residual_bits} (one scale shared by all 6 additions)")
         table.add_row("Quantization", "Rounding", config.quantization.rounding)
         table.add_row("Quantization", "Range Momentum", str(config.quantization.activation_range_momentum))
         table.add_row("")
@@ -111,7 +113,13 @@ def _device_name(device: torch.device) -> str:
 
 
 def _quantization_formats(config: AppConfig) -> tuple[str, str]:
-    """モデルに対応する重み・活性形式の表示名を返す。"""
+    """モデルに対応する重み・活性化形式の表示名を返す。"""
+    if config.model.name == "basic_vit_fp4":
+        return "INT8 (first/classifier), FP4 E2M1 (body)", "FP4 E2M1 (body), shared INT4 (residual), INT8 (average pool)"
+    if config.model.name == "basic_vit_ufp4":
+        return "INT8 (first/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), FP4 E2M1 (signed attention), shared INT4 (residual), INT8 (average pool)"
+    if config.model.name == "basic_vit_int4":
+        return "INT8 (first/classifier), INT4 (body)", "INT4 (body and shared residual), INT8 (average pool)"
     if config.model.name in {"resnet18_fp4", "mobilenet_v2_fp4"}:
         return "INT8 (stem/classifier), FP4 E2M1 (body)", "FP4 E2M1 (body), UINT8 (average pool)"
     if config.model.name in {"resnet18_ufp4", "mobilenet_v2_ufp4"}:

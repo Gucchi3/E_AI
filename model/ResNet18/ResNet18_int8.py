@@ -1,53 +1,74 @@
-"""INT8 QAT ResNet-18 for 32x32 CIFAR-10 images."""
+"""32x32のCIFAR-10入力に合わせたINT8 QAT ResNet-18。"""
 
 from __future__ import annotations
 
 import torch
 from torch import nn
 
-from utils.quantization import IntegerQuantizer, QuantConv2d, QuantLinear
+from utils.quantization import IntegerQuantizer, QuantConv2d, QuantLinear, QuantResidualAdd, QuantizedAvgPool2d
 
 
 class INT8BasicBlock(nn.Module):
-    """INT8 residual block whose post-ReLU activations use unsigned INT8."""
+    """両枝を同じINT8 scaleへ変換してから残差加算するBasicBlock。"""
 
     expansion = 1
 
     def __init__(self, in_channels: int, out_channels: int, stride: int, rounding: str, activation_range_momentum: float) -> None:
         super().__init__()
-        self.conv1               = QuantConv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.bn1                 = nn.Identity()
-        self.relu1               = nn.ReLU(inplace=False)
-        self.conv1_quantizer     = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
-        self.conv2               = QuantConv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.bn2                 = nn.Identity()
-        self.conv2_quantizer     = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
-        self.shortcut_quantizer  = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum) if stride != 1 or in_channels != out_channels else None
-        self.shortcut            = nn.Identity() if stride == 1 and in_channels == out_channels else nn.Sequential(QuantConv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=True, weight_bits=8, rounding=rounding, quantizer="integer"), nn.Identity())
-        self.relu2               = nn.ReLU(inplace=False)
-        self.output_quantizer    = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
+        use_projection = stride != 1 or in_channels != out_channels
+
+        self.conv1            = QuantConv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.bn1              = nn.Identity()
+        self.relu1            = nn.ReLU(inplace=False)
+        self.conv1_quantizer  = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
+        self.conv2            = QuantConv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.bn2              = nn.Identity()
+        self.conv2_quantizer  = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.residual_add     = QuantResidualAdd(bit_width=8, rounding=rounding, range_momentum=activation_range_momentum)
+        self.relu2            = nn.ReLU(inplace=False)
+        self.output_quantizer = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
+
+        if use_projection:
+            self.shortcut           = nn.Sequential(QuantConv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=True, weight_bits=8, rounding=rounding, quantizer="integer"), nn.Identity())
+            self.shortcut_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        else:
+            self.shortcut           = nn.Identity()
+            self.shortcut_quantizer = None
 
     @property
     def output_scale(self) -> torch.Tensor:
+        """次のblockへ渡すunsigned INT8 scaleを返す。"""
         return self.output_quantizer.scale
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
-        if isinstance(self.shortcut, nn.Identity):
-            identity = value
-        else:
+        identity       = value
+        identity_scale = input_scale
+
+        if not isinstance(self.shortcut, nn.Identity):
             if self.shortcut_quantizer is None:
                 raise RuntimeError("Projection shortcut quantizer is not initialized.")
-            identity = self.shortcut_quantizer(self.shortcut[0](value, input_scale))
+            identity       = self.shortcut[0](value, input_scale)
+            identity       = self.shortcut[1](identity)
+            identity       = self.shortcut_quantizer(identity)
+            identity_scale = self.shortcut_quantizer.scale
 
-        value = self.conv1(value, input_scale)
-        value = self.conv1_quantizer(self.relu1(value))
-        value = self.conv2_quantizer(self.conv2(value, self.conv1_quantizer.scale))
-        # Fake-quantized branches are dequantized float values here; the sum is quantized again immediately below.
-        return self.output_quantizer(self.relu2(value + identity))
+        transformed = self.conv1(value, input_scale)
+        transformed = self.bn1(transformed)
+        transformed = self.relu1(transformed)
+        transformed = self.conv1_quantizer(transformed)
+
+        transformed = self.conv2(transformed, self.conv1_quantizer.scale)
+        transformed = self.bn2(transformed)
+        transformed = self.conv2_quantizer(transformed)
+
+        transformed, _ = self.residual_add(transformed, self.conv2_quantizer.scale, identity, identity_scale)
+        transformed    = self.relu2(transformed)
+        transformed    = self.output_quantizer(transformed)
+        return transformed
 
 
 class ResNet18INT8(nn.Module):
-    """CIFAR ResNet-18 with INT8 weights and activations."""
+    """最初と最後を含む全Conv／LinearをINT8化したCIFAR向けResNet-18。"""
 
     def __init__(self, num_classes: int = 10, input_bits: int = 8, rounding: str = "ties_away_from_zero", activation_range_momentum: float = 0.95, image_size: int = 32) -> None:
         super().__init__()
@@ -56,35 +77,19 @@ class ResNet18INT8(nn.Module):
         if input_bits != 8:
             raise ValueError("ResNet18INT8 requires input_bits=8.")
 
-        self.in_channels      = 64
         self.input_quantizer  = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, fixed_scale=1.0 / 255.0)
         self.stem             = nn.Sequential(QuantConv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer"), nn.Identity(), nn.ReLU(inplace=False))
         self.stem_quantizer   = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
-        self.stage1           = self._make_stage(out_channels=64, block_count=2, stride=1, rounding=rounding, activation_range_momentum=activation_range_momentum)
-        self.stage2           = self._make_stage(out_channels=128, block_count=2, stride=2, rounding=rounding, activation_range_momentum=activation_range_momentum)
-        self.stage3           = self._make_stage(out_channels=256, block_count=2, stride=2, rounding=rounding, activation_range_momentum=activation_range_momentum)
-        self.stage4           = self._make_stage(out_channels=512, block_count=2, stride=2, rounding=rounding, activation_range_momentum=activation_range_momentum)
+        self.stage1           = nn.Sequential(INT8BasicBlock(64, 64, 1, rounding, activation_range_momentum), INT8BasicBlock(64, 64, 1, rounding, activation_range_momentum))
+        self.stage2           = nn.Sequential(INT8BasicBlock(64, 128, 2, rounding, activation_range_momentum), INT8BasicBlock(128, 128, 1, rounding, activation_range_momentum))
+        self.stage3           = nn.Sequential(INT8BasicBlock(128, 256, 2, rounding, activation_range_momentum), INT8BasicBlock(256, 256, 1, rounding, activation_range_momentum))
+        self.stage4           = nn.Sequential(INT8BasicBlock(256, 512, 2, rounding, activation_range_momentum), INT8BasicBlock(512, 512, 1, rounding, activation_range_momentum))
         self.pool_quantizer   = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
-        self.pool             = nn.AvgPool2d(kernel_size=4, stride=4)
+        self.pool             = QuantizedAvgPool2d(kernel_size=4, stride=4, bit_width=8, signed=False, rounding=rounding)
         self.output_quantizer = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
         self.classifier       = QuantLinear(512, num_classes, weight_bits=8, rounding=rounding, quantizer="integer")
 
         self._initialize_weights()
-
-    def _make_stage(self, out_channels: int, block_count: int, stride: int, rounding: str, activation_range_momentum: float) -> nn.Sequential:
-        blocks = [INT8BasicBlock(self.in_channels, out_channels, stride, rounding, activation_range_momentum)]
-        self.in_channels = out_channels
-        blocks.extend(INT8BasicBlock(self.in_channels, out_channels, 1, rounding, activation_range_momentum) for _ in range(1, block_count))
-        return nn.Sequential(*blocks)
-
-    def _forward_stage(self, stage: nn.Sequential, value: torch.Tensor, input_scale: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        scale = input_scale
-        for block in stage:
-            if not isinstance(block, INT8BasicBlock):
-                raise TypeError("INT8 ResNet stages must contain INT8BasicBlock modules.")
-            value = block(value, scale)
-            scale = block.output_scale
-        return value, scale
 
     def _initialize_weights(self) -> None:
         for module in self.modules():
@@ -98,13 +103,33 @@ class ResNet18INT8(nn.Module):
                     nn.init.zeros_(module.bias)
 
     def forward(self, value: torch.Tensor) -> torch.Tensor:
+        stage1_block1 = self.stage1[0]
+        stage1_block2 = self.stage1[1]
+        stage2_block1 = self.stage2[0]
+        stage2_block2 = self.stage2[1]
+        stage3_block1 = self.stage3[0]
+        stage3_block2 = self.stage3[1]
+        stage4_block1 = self.stage4[0]
+        stage4_block2 = self.stage4[1]
+
         value = self.input_quantizer(value)
-        value = self.stem_quantizer(self.stem[2](self.stem[0](value, self.input_quantizer.scale)))
-        value, scale = self._forward_stage(self.stage1, value, self.stem_quantizer.scale)
-        value, scale = self._forward_stage(self.stage2, value, scale)
-        value, scale = self._forward_stage(self.stage3, value, scale)
-        value, _ = self._forward_stage(self.stage4, value, scale)
-        value = self.pool_quantizer(value)
-        value = self.output_quantizer(self.pool(value))
-        value = torch.flatten(value, start_dim=1)
-        return self.classifier(value, self.output_quantizer.scale)
+        value = self.stem[0](value, self.input_quantizer.scale)
+        value = self.stem[1](value)
+        value = self.stem[2](value)
+        value = self.stem_quantizer(value)
+
+        value = stage1_block1(value, self.stem_quantizer.scale)
+        value = stage1_block2(value, stage1_block1.output_scale)
+        value = stage2_block1(value, stage1_block2.output_scale)
+        value = stage2_block2(value, stage2_block1.output_scale)
+        value = stage3_block1(value, stage2_block2.output_scale)
+        value = stage3_block2(value, stage3_block1.output_scale)
+        value = stage4_block1(value, stage3_block2.output_scale)
+        value = stage4_block2(value, stage4_block1.output_scale)
+
+        value             = self.pool_quantizer(value)
+        value, pool_scale = self.pool(value, self.pool_quantizer.scale)
+        value             = self.output_quantizer(value)
+        value             = torch.flatten(value, start_dim=1)
+        value             = self.classifier(value, self.output_quantizer.scale)
+        return value

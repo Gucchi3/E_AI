@@ -14,16 +14,16 @@
     "num_workers"  : 8
   },
   "model": {
-    "name"        : "basic_vit_int8",
+    "name"        : "basic_vit_int4",
     "num_classes" : 10,
     "load_weight" : true,
     "weight_path" : "./save/basic_vit_fp32/model_best.pth"
   },
   "quantization": {
-    "weight_bits"              : 8,
-    "activation_bits"          : 8,
+    "weight_bits"              : 4,
+    "activation_bits"          : 4,
     "input_bits"               : 8,
-    "residual_bits"            : 8,
+    "residual_bits"            : 4,
     "rounding"                 : "ties_away_from_zero",
     "activation_range_momentum": 0.95
   },

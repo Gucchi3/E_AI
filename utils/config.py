@@ -8,11 +8,14 @@ from pathlib import Path
 from typing import Any
 
 
-MODEL_NAMES = frozenset({"basic_vit_fp32", "basic_vit_int8", "cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn", "test_cnn", "ufp4_test_cnn", "resnet18_fp32", "resnet18_int8", "resnet18_int4", "resnet18_fp4", "resnet18_ufp4", "mobilenet_v2_fp32", "mobilenet_v2_int8", "mobilenet_v2_int4", "mobilenet_v2_fp4", "mobilenet_v2_ufp4"})
+MODEL_NAMES = frozenset({"basic_vit_fp32", "basic_vit_int8", "basic_vit_int4", "basic_vit_fp4", "basic_vit_ufp4", "cnn", "int8_cnn", "int4_cnn", "fp4_cnn", "mixed_cnn", "test_cnn", "ufp4_test_cnn", "resnet18_fp32", "resnet18_int8", "resnet18_int4", "resnet18_fp4", "resnet18_ufp4", "mobilenet_v2_fp32", "mobilenet_v2_int8", "mobilenet_v2_int4", "mobilenet_v2_fp4", "mobilenet_v2_ufp4"})
 FP32_MODEL_NAMES = frozenset({"basic_vit_fp32", "cnn", "resnet18_fp32", "mobilenet_v2_fp32"})
 QUANTIZED_MODEL_NAMES = MODEL_NAMES - FP32_MODEL_NAMES
 MODEL_BIT_WIDTHS = {
     "basic_vit_int8": 8,
+    "basic_vit_int4": 4,
+    "basic_vit_fp4": 4,
+    "basic_vit_ufp4": 4,
     "int8_cnn": 8,
     "int4_cnn": 4,
     "fp4_cnn": 4,
@@ -27,6 +30,12 @@ MODEL_BIT_WIDTHS = {
     "mobilenet_v2_int4": 4,
     "mobilenet_v2_fp4": 4,
     "mobilenet_v2_ufp4": 4,
+}
+MODEL_RESIDUAL_BIT_WIDTHS = {
+    "basic_vit_int8": 8,
+    "basic_vit_int4": 4,
+    "basic_vit_fp4": 4,
+    "basic_vit_ufp4": 4,
 }
 
 
@@ -72,6 +81,7 @@ class QuantizationConfig:
     weight_bits              : int
     activation_bits          : int
     input_bits               : int
+    residual_bits            : int
     rounding                 : str
     activation_range_momentum: float
 
@@ -126,7 +136,7 @@ def load_config(path: str | Path) -> AppConfig:
     run_config          = RunConfig(mode=_string(run_raw, "mode"), seed=_integer(run_raw, "seed"), device=_string(run_raw, "device"), log_dir=_string(run_raw, "log_dir"))
     data_config         = DataConfig(dataset=_string(data_raw, "dataset"), root=_string(data_raw, "root"), image_size=_integer(data_raw, "image_size"), normalization=_string(data_raw, "normalization"), batch_size=_integer(data_raw, "batch_size"), num_workers=_integer(data_raw, "num_workers"))
     model_config        = ModelConfig(name=_string(model_raw, "name"), num_classes=_integer(model_raw, "num_classes"), load_weight=_boolean(model_raw, "load_weight"), weight_path=_string(model_raw, "weight_path"))
-    quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), rounding=_string(quant_raw, "rounding"), activation_range_momentum=_number_or_default(quant_raw, "activation_range_momentum", 0.95))
+    quantization_config = QuantizationConfig(weight_bits=_integer(quant_raw, "weight_bits"), activation_bits=_integer(quant_raw, "activation_bits"), input_bits=_integer(quant_raw, "input_bits"), residual_bits=_integer_or_default(quant_raw, "residual_bits", _integer(quant_raw, "activation_bits")), rounding=_string(quant_raw, "rounding"), activation_range_momentum=_number_or_default(quant_raw, "activation_range_momentum", 0.95))
     train_config        = TrainConfig(epochs=_integer(train_raw, "epochs"), learning_rate=_number(train_raw, "learning_rate"), minimum_learning_rate=_number_or_default(train_raw, "minimum_learning_rate", 0.0), weight_decay=_number(train_raw, "weight_decay"), label_smoothing=_number(train_raw, "label_smoothing"), mixup_alpha=_number_or_default(train_raw, "mixup_alpha", 0.0), cutmix_alpha=_number_or_default(train_raw, "cutmix_alpha", 0.0), mixup_probability=_number_or_default(train_raw, "mixup_probability", 1.0), mixup_switch_probability=_number_or_default(train_raw, "mixup_switch_probability", 0.5))
     config              = AppConfig(run=run_config, data=data_config, model=model_config, quantization=quantization_config, train=train_config)
     _validate(config)
@@ -161,6 +171,14 @@ def _string(raw: dict[str, Any], name: str) -> str:
 def _integer(raw: dict[str, Any], name: str) -> int:
     """整数の設定値を取り出す。"""
     value = raw.get(name)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"Config value {name!r} must be an integer.")
+    return value
+
+
+def _integer_or_default(raw: dict[str, Any], name: str, default: int) -> int:
+    """省略可能な整数設定を取り出す。"""
+    value = raw.get(name, default)
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"Config value {name!r} must be an integer.")
     return value
@@ -220,6 +238,8 @@ def _validate(config: AppConfig) -> None:
         raise ValueError("quantization.activation_bits must be 2, 4, 8, or 16.")
     if config.quantization.input_bits != 8:
         raise ValueError("quantization.input_bits must be 8 because image input is uint8.")
+    if config.quantization.residual_bits not in {2, 4, 8, 16}:
+        raise ValueError("quantization.residual_bits must be 2, 4, 8, or 16.")
     if config.quantization.rounding not in {"ties_away_from_zero", "ties_to_positive", "ties_to_even"}:
         raise ValueError("Unsupported quantization.rounding value.")
     if not 0.0 <= config.quantization.activation_range_momentum < 1.0:
@@ -229,6 +249,9 @@ def _validate(config: AppConfig) -> None:
         raise ValueError(f"{config.model.name} requires quantization.weight_bits={expected_bits}.")
     if expected_bits is not None and config.quantization.activation_bits != expected_bits:
         raise ValueError(f"{config.model.name} requires quantization.activation_bits={expected_bits}.")
+    expected_residual_bits = MODEL_RESIDUAL_BIT_WIDTHS.get(config.model.name)
+    if expected_residual_bits is not None and config.quantization.residual_bits != expected_residual_bits:
+        raise ValueError(f"{config.model.name} requires quantization.residual_bits={expected_residual_bits}.")
     if config.model.name in QUANTIZED_MODEL_NAMES and config.data.normalization != "zero_one":
         raise ValueError("Quantized models require data.normalization='zero_one' for uint8 input.")
     if config.train.epochs <= 0:
