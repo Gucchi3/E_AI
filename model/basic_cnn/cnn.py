@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from .blocks import ConvBlock
+from ..blocks import ConvBlock
 
 
 class CNN(nn.Module):

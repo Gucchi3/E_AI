@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
-from .cnn import CNN
-from .fp4_cnn import FP4CNN
-from .int4_cnn import Int4CNN
-from .int8_cnn import Int8CNN
-from .mixed_cnn import MixedCNN
-from .test_cnn import TestCNN
-from .ufp4_test_cnn import UFP4TestCNN
+from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
+from .MobileNet_v2 import MobileNetV2FP32
+from .ResNet16 import ResNet16FP32
 
 
-Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN
+Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet16FP32 | MobileNetV2FP32
+
+AVAILABLE_MODELS = (
+    "cnn",
+    "int8_cnn",
+    "int4_cnn",
+    "fp4_cnn",
+    "mixed_cnn",
+    "test_cnn",
+    "ufp4_test_cnn",
+    "resnet16_fp32",
+    "mobilenet_v2_fp32",
+)
 
 
 def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str = "ties_away_from_zero", activation_range_momentum: float = 0.95, image_size: int = 32) -> Model:
@@ -30,4 +38,8 @@ def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str 
         return TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "ufp4_test_cnn":
         return UFP4TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
-    raise ValueError(f"Unsupported model: {name!r}. Available: ['cnn', 'int8_cnn', 'int4_cnn', 'fp4_cnn', 'mixed_cnn', 'test_cnn', 'ufp4_test_cnn']")
+    if name == "resnet16_fp32":
+        return ResNet16FP32(num_classes=num_classes, image_size=image_size)
+    if name == "mobilenet_v2_fp32":
+        return MobileNetV2FP32(num_classes=num_classes, image_size=image_size)
+    raise ValueError(f"Unsupported model: {name!r}. Available: {list(AVAILABLE_MODELS)}")

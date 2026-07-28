@@ -1,4 +1,4 @@
-"""INT8とFP4を組み合わせたCIFAR-10 CNN。"""
+"""FP4 E2M1 QATのCIFAR-10 CNN。"""
 
 from __future__ import annotations
 
@@ -7,18 +7,18 @@ from torch import nn
 
 from utils.quantization import IntegerQuantizer, QuantLinear
 
-from .blocks import BlockQuantization, QuantConvBlock
+from ..blocks import BlockQuantization, QuantConvBlock
 
 
-class MixedCNN(nn.Module):
-    """先頭と末尾をINT8、中間をFP4へFake Quantizationする分類モデル。"""
+class FP4CNN(nn.Module):
+    """先頭と末尾をINT8、中間をFP4 E2M1へFake Quantizationする分類モデル。"""
 
     def __init__(self, num_classes: int = 10, input_bits: int = 8, rounding: str = "ties_away_from_zero", activation_range_momentum: float = 0.95, image_size: int = 32) -> None:
         super().__init__()
         if image_size % 8 != 0:
             raise ValueError("image_size must be divisible by 8.")
         if input_bits != 8:
-            raise ValueError("MixedCNN input_bits must be 8.")
+            raise ValueError("FP4CNN input_bits must be 8.")
 
         feature_size         = image_size // 8
         int8_to_fp4          = BlockQuantization("integer", "fp4", 8, 4)
