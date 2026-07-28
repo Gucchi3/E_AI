@@ -28,11 +28,11 @@ python main.py --config config/fp4_cnn.json
 python main.py --config config/mixed_cnn.json
 python main.py --config config/test_cnn.json
 python main.py --config config/ufp4_test_cnn.json
-python main.py --config config/resnet16_fp32.json
+python main.py --config config/resnet18_fp32.json
 python main.py --config config/mobilenet_v2_fp32.json
 ```
 
-`resnet16_fp32`は32×32入力向けのResNet-16、`mobilenet_v2_fp32`はstemのstrideだけを1へ変更したCIFAR-10向けMobileNetV2です。既存のCNN系モデルは`model/basic_cnn/`、ResNet-16は`model/ResNet16/`、MobileNetV2は`model/MobileNet_v2/`に整理しています。
+`resnet18_fp32`は3×3・stride 1のstemとmax poolingなしで32×32入力へ適応したResNet-18、`mobilenet_v2_fp32`はstemのstrideだけを1へ変更したCIFAR-10向けMobileNetV2です。既存のCNN系モデルは`model/basic_cnn/`、ResNet-18は`model/ResNet18/`、MobileNetV2は`model/MobileNet_v2/`に整理しています。
 
 モデル名と実装ファイル、設定ファイルは`cnn`、`int8_cnn`、`int4_cnn`、`fp4_cnn`、`mixed_cnn`、`test_cnn`、`ufp4_test_cnn`で統一しています。
 

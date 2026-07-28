@@ -3,7 +3,7 @@
 from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
 from .builder import AVAILABLE_MODELS, build_model
 from .MobileNet_v2 import MobileNetV2FP32
-from .ResNet16 import ResNet16FP32
+from .ResNet18 import ResNet18FP32
 
 
 __all__ = [
@@ -14,7 +14,7 @@ __all__ = [
     "Int8CNN",
     "MixedCNN",
     "MobileNetV2FP32",
-    "ResNet16FP32",
+    "ResNet18FP32",
     "TestCNN",
     "UFP4TestCNN",
     "build_model",
