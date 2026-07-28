@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
-from .MobileNet_v2 import MobileNetV2FP32
-from .ResNet18 import ResNet18FP32
+from .MobileNet_v2 import MobileNetV2FP4, MobileNetV2FP32, MobileNetV2INT4, MobileNetV2INT8, MobileNetV2UFP4
+from .ResNet18 import ResNet18FP4, ResNet18FP32, ResNet18INT4, ResNet18INT8, ResNet18UFP4
 
 
-Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | MobileNetV2FP32
+Model = CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | ResNet18INT8 | ResNet18INT4 | ResNet18FP4 | ResNet18UFP4 | MobileNetV2FP32 | MobileNetV2INT8 | MobileNetV2INT4 | MobileNetV2FP4 | MobileNetV2UFP4
 
 AVAILABLE_MODELS = (
     "cnn",
@@ -18,7 +18,15 @@ AVAILABLE_MODELS = (
     "test_cnn",
     "ufp4_test_cnn",
     "resnet18_fp32",
+    "resnet18_int8",
+    "resnet18_int4",
+    "resnet18_fp4",
+    "resnet18_ufp4",
     "mobilenet_v2_fp32",
+    "mobilenet_v2_int8",
+    "mobilenet_v2_int4",
+    "mobilenet_v2_fp4",
+    "mobilenet_v2_ufp4",
 )
 
 
@@ -40,6 +48,22 @@ def build_model(name: str, num_classes: int, input_bits: int = 8, rounding: str 
         return UFP4TestCNN(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "resnet18_fp32":
         return ResNet18FP32(num_classes=num_classes, image_size=image_size)
+    if name == "resnet18_int8":
+        return ResNet18INT8(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "resnet18_int4":
+        return ResNet18INT4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "resnet18_fp4":
+        return ResNet18FP4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "resnet18_ufp4":
+        return ResNet18UFP4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "mobilenet_v2_fp32":
         return MobileNetV2FP32(num_classes=num_classes, image_size=image_size)
+    if name == "mobilenet_v2_int8":
+        return MobileNetV2INT8(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "mobilenet_v2_int4":
+        return MobileNetV2INT4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "mobilenet_v2_fp4":
+        return MobileNetV2FP4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "mobilenet_v2_ufp4":
+        return MobileNetV2UFP4(num_classes=num_classes, input_bits=input_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     raise ValueError(f"Unsupported model: {name!r}. Available: {list(AVAILABLE_MODELS)}")
