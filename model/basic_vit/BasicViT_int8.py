@@ -17,18 +17,18 @@ class INT8BasicViTStem(nn.Module):
         super().__init__()
         middle_channels = embed_dim // 2
 
-        self.conv1 = QuantConv2d(3, middle_channels, kernel_size=3, stride=2, padding=1, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.bn1 = nn.BatchNorm2d(middle_channels)
+        self.conv1 = QuantConv2d(3, middle_channels, kernel_size=3, stride=2, padding=1, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.bn1 = nn.Identity()
         self.relu1 = nn.ReLU6(inplace=False)
         self.quantizer1 = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.conv2_depthwise = QuantConv2d(middle_channels, middle_channels, kernel_size=3, stride=2, padding=1, groups=middle_channels, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.bn2_depthwise = nn.BatchNorm2d(middle_channels)
+        self.conv2_depthwise = QuantConv2d(middle_channels, middle_channels, kernel_size=3, stride=2, padding=1, groups=middle_channels, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.bn2_depthwise = nn.Identity()
         self.relu2_depthwise = nn.ReLU6(inplace=False)
         self.quantizer2_depthwise = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.conv2_pointwise = QuantConv2d(middle_channels, embed_dim, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.bn2_pointwise = nn.BatchNorm2d(embed_dim)
+        self.conv2_pointwise = QuantConv2d(middle_channels, embed_dim, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.bn2_pointwise = nn.Identity()
         self.relu2_pointwise = nn.ReLU6(inplace=False)
         self.quantizer2_pointwise = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
 
@@ -60,18 +60,18 @@ class INT8ConvolutionalFeedForward(nn.Module):
 
     def __init__(self, channels: int, hidden_channels: int, rounding: str, activation_range_momentum: float) -> None:
         super().__init__()
-        self.expand_conv = QuantConv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.expand_bn = nn.BatchNorm2d(hidden_channels)
+        self.expand_conv = QuantConv2d(channels, hidden_channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.expand_bn = nn.Identity()
         self.expand_relu = nn.ReLU6(inplace=False)
         self.expand_quantizer = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.depthwise_conv = QuantConv2d(hidden_channels, hidden_channels, kernel_size=3, stride=1, padding=1, groups=hidden_channels, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.depthwise_bn = nn.BatchNorm2d(hidden_channels)
+        self.depthwise_conv = QuantConv2d(hidden_channels, hidden_channels, kernel_size=3, stride=1, padding=1, groups=hidden_channels, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.depthwise_bn = nn.Identity()
         self.depthwise_relu = nn.ReLU6(inplace=False)
         self.depthwise_quantizer = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.project_conv = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.project_bn = nn.BatchNorm2d(channels)
+        self.project_conv = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.project_bn = nn.Identity()
         self.project_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
 
     @property
@@ -132,16 +132,16 @@ class INT8SimpleAttention(nn.Module):
         query_key_channels = num_heads * key_dim
         value_channels = num_heads * value_dim
 
-        self.query_conv = QuantConv2d(channels, query_key_channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.query_bn = nn.BatchNorm2d(query_key_channels)
+        self.query_conv = QuantConv2d(channels, query_key_channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.query_bn = nn.Identity()
         self.query_neq = PerTokenNEQ(bit_width=8, rounding=rounding)
 
-        self.key_conv = QuantConv2d(channels, query_key_channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.key_bn = nn.BatchNorm2d(query_key_channels)
+        self.key_conv = QuantConv2d(channels, query_key_channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.key_bn = nn.Identity()
         self.key_neq = PerTokenNEQ(bit_width=8, rounding=rounding)
 
-        self.value_conv = QuantConv2d(channels, value_channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.value_bn = nn.BatchNorm2d(value_channels)
+        self.value_conv = QuantConv2d(channels, value_channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.value_bn = nn.Identity()
         self.value_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
 
         self.query_key_matmul = QuantMatMul(rounding=rounding)
@@ -150,8 +150,8 @@ class INT8SimpleAttention(nn.Module):
 
         self.project_input_relu = nn.ReLU6(inplace=False)
         self.project_input_quantizer = IntegerQuantizer(bit_width=8, signed=False, rounding=rounding, range_momentum=activation_range_momentum)
-        self.project_conv = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.project_bn = nn.BatchNorm2d(channels)
+        self.project_conv = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.project_bn = nn.Identity()
         self.project_output_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
 
     @property
@@ -246,8 +246,8 @@ class BasicViTINT8(nn.Module):
         self.attention_block1 = INT8AttentionFeedForwardBlock(embed_dim, hidden_channels, num_heads, key_dim, value_dim, rounding, activation_range_momentum)
         self.attention_block2 = INT8AttentionFeedForwardBlock(embed_dim, hidden_channels, num_heads, key_dim, value_dim, rounding, activation_range_momentum)
 
-        self.head_conv = QuantConv2d(embed_dim, embed_dim, kernel_size=1, stride=1, padding=0, bias=False, weight_bits=8, rounding=rounding, quantizer="integer")
-        self.head_bn = nn.BatchNorm2d(embed_dim)
+        self.head_conv = QuantConv2d(embed_dim, embed_dim, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
+        self.head_bn = nn.Identity()
         self.pool = nn.AvgPool2d(kernel_size=8, stride=8)
         self.classifier_input_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
         self.classifier = QuantLinear(embed_dim, num_classes, bias=True, weight_bits=8, rounding=rounding, quantizer="integer")
@@ -259,6 +259,8 @@ class BasicViTINT8(nn.Module):
             if isinstance(module, nn.Conv2d):
                 fan_out = module.kernel_size[0] * module.kernel_size[1] * module.out_channels
                 nn.init.normal_(module.weight, mean=0.0, std=math.sqrt(2.0 / fan_out))
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
             elif isinstance(module, nn.BatchNorm2d):
                 nn.init.ones_(module.weight)
                 nn.init.zeros_(module.bias)
