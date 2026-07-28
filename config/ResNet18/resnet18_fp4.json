@@ -14,10 +14,10 @@
     "num_workers"  : 8
   },
   "model": {
-    "name"        : "mobilenet_v2_fp4",
+    "name"        : "resnet18_fp4",
     "num_classes" : 10,
     "load_weight" : true,
-    "weight_path" : "./save/mobilenetv2_fp32/model_best.pth"
+    "weight_path" : "./save/resnet18_fp32/model_best.pth"
   },
   "quantization": {
     "weight_bits"              : 4,
@@ -27,8 +27,8 @@
     "activation_range_momentum": 0.95
   },
   "train": {
-    "epochs"                    : 100,
-    "learning_rate"             : 5e-4,
+    "epochs"                    : 50,
+    "learning_rate"             : 5e-5,
     "minimum_learning_rate"     : 5e-7,
     "weight_decay"              : 1e-4,
     "label_smoothing"           : 0.1,
