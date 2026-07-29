@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from .basic_vit import BasicViTFP4, BasicViTFP32, BasicViTINT4, BasicViTINT8, BasicViTTest1, BasicViTTest2, BasicViTTest3, BasicViTTest4, BasicViTTest5, BasicViTUFP4
-from .basic_cnn import CNN, FP4CNN, Int4CNN, Int8CNN, MixedCNN, TestCNN, UFP4TestCNN
-from .MobileNet_v2 import MobileNetV2FP4, MobileNetV2FP32, MobileNetV2INT4, MobileNetV2INT8, MobileNetV2UFP4
-from .ResNet18 import ResNet18FP4, ResNet18FP32, ResNet18INT4, ResNet18INT8, ResNet18UFP4
+from .basic_vit import BasicViTFP32, BasicViTINT8, BasicViTINT4, BasicViTFP4, BasicViTUFP4, BasicViTTest1, BasicViTTest2, BasicViTTest3, BasicViTTest4, BasicViTTest5, BasicViTTest6, BasicViTTest7
+from .basic_cnn import CNN, Int8CNN, Int4CNN, FP4CNN, MixedCNN, TestCNN, UFP4TestCNN
+from .MobileNet_v2 import MobileNetV2FP32, MobileNetV2INT8, MobileNetV2INT4, MobileNetV2FP4, MobileNetV2UFP4
+from .ResNet18 import ResNet18FP32, ResNet18INT8, ResNet18INT4, ResNet18FP4, ResNet18UFP4
 
 
-Model = BasicViTFP32 | BasicViTINT8 | BasicViTINT4 | BasicViTFP4 | BasicViTUFP4 | BasicViTTest1 | BasicViTTest2 | BasicViTTest3 | BasicViTTest4 | BasicViTTest5 | CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | ResNet18INT8 | ResNet18INT4 | ResNet18FP4 | ResNet18UFP4 | MobileNetV2FP32 | MobileNetV2INT8 | MobileNetV2INT4 | MobileNetV2FP4 | MobileNetV2UFP4
+Model = BasicViTFP32 | BasicViTINT8 | BasicViTINT4 | BasicViTFP4 | BasicViTUFP4 | BasicViTTest1 | BasicViTTest2 | BasicViTTest3 | BasicViTTest4 | BasicViTTest5 | BasicViTTest6 | BasicViTTest7 | CNN | Int8CNN | Int4CNN | FP4CNN | MixedCNN | TestCNN | UFP4TestCNN | ResNet18FP32 | ResNet18INT8 | ResNet18INT4 | ResNet18FP4 | ResNet18UFP4 | MobileNetV2FP32 | MobileNetV2INT8 | MobileNetV2INT4 | MobileNetV2FP4 | MobileNetV2UFP4
 
 AVAILABLE_MODELS = (
     "basic_vit_fp32",
@@ -21,6 +21,8 @@ AVAILABLE_MODELS = (
     "basic_vit_test3",
     "basic_vit_test4",
     "basic_vit_test5",
+    "basic_vit_test6",
+    "basic_vit_test7",
     "cnn",
     "int8_cnn",
     "int4_cnn",
@@ -72,6 +74,12 @@ def build_model(name: str, num_classes: int, input_bits: int = 8, residual_bits:
     if name == "basic_vit_test5":
         selected_residual_bits = 8 if residual_bits is None else residual_bits
         return BasicViTTest5(num_classes=num_classes, input_bits=input_bits, residual_bits=selected_residual_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "basic_vit_test6":
+        selected_residual_bits = 8 if residual_bits is None else residual_bits
+        return BasicViTTest6(num_classes=num_classes, input_bits=input_bits, residual_bits=selected_residual_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
+    if name == "basic_vit_test7":
+        selected_residual_bits = 8 if residual_bits is None else residual_bits
+        return BasicViTTest7(num_classes=num_classes, input_bits=input_bits, residual_bits=selected_residual_bits, rounding=rounding, activation_range_momentum=activation_range_momentum, image_size=image_size)
     if name == "cnn":
         return CNN(num_classes=num_classes, image_size=image_size)
     if name == "int8_cnn":

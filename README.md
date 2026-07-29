@@ -102,6 +102,18 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 - `test_cnn`: 先頭と末尾をINT8、中間をUINT4活性×FP4 E2M1重みで量子化
 - `ufp4_test_cnn`: 先頭と末尾をINT8、中間をUFP4 E2M2活性×FP4 E2M1重みで量子化
 
+BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`basic_vit_fp4`、`basic_vit_ufp4`の順で基本モデルを並べ、追加実験を`basic_vit_test1`～`basic_vit_test7`として管理します。
+
+| モデル名 | 本体 | Attention | 残差 |
+| --- | --- | --- | --- |
+| `basic_vit_test1` | FP4重み、ReLU後UFP4 | FP4 | 独立scale INT8 |
+| `basic_vit_test2` | FP4重み、ReLU後UFP4 | INT8 | 共有scale INT4 |
+| `basic_vit_test3` | FP4重み、ReLU後UFP4 | INT8 | 独立scale INT8 |
+| `basic_vit_test4` | FP4重み、ReLU後UFP4 | FP4 | 独立scale INT4 |
+| `basic_vit_test5` | FP4重み、ReLU後UFP4 | FP4 | 共有scale INT8 |
+| `basic_vit_test6` | INT4重み、signed INT4活性 | signed INT4 | 共有scale INT8 |
+| `basic_vit_test7` | INT4重み、ReLU後UINT4 | signed INT4 | 共有scale INT8 |
+
 すべてのConvは3×3です。平均プーリングは使用せず、32×32入力をstride 2のConvで`32→16→8→4`へ縮小し、`64×4×4`をFlattenして線形層へ入力します。
 
 活性scaleは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scaleと整数biasは重みと同じ`state_dict`へ保存されます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。
