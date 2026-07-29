@@ -23,11 +23,12 @@
     "weight_bits": 8,
     "activation_bits": 8,
     "input_bits": 8,
+    "residual_bits": 8,
     "rounding": "ties_away_from_zero",
     "activation_range_momentum": 0.95
   },
   "train": {
-    "epochs": 100,
+    "epochs": 300,
     "learning_rate": 0.0005,
     "minimum_learning_rate": 5e-07,
     "weight_decay": 0.0001,
