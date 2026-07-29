@@ -47,8 +47,10 @@ def print_training_info(config: AppConfig, model: torch.nn.Module, device: torch
         table.add_row("Quantization", "Weights", weight_format)
         table.add_row("Quantization", "Activations", activation_format)
         table.add_row("Quantization", "Input", f"uint{config.quantization.input_bits}")
-        if config.model.name in {"basic_vit_int8", "basic_vit_int4", "basic_vit_fp4", "basic_vit_ufp4"}:
+        if config.model.name in {"basic_vit_int8", "basic_vit_int4", "basic_vit_fp4", "basic_vit_ufp4", "basic_vit_test2"}:
             table.add_row("Quantization", "Residual", f"INT{config.quantization.residual_bits} (one scale shared by all 6 additions)")
+        if config.model.name in {"basic_vit_test1", "basic_vit_test3"}:
+            table.add_row("Quantization", "Residual", f"INT{config.quantization.residual_bits} (independent scale for each of 6 additions)")
         table.add_row("Quantization", "Rounding", config.quantization.rounding)
         table.add_row("Quantization", "Range Momentum", str(config.quantization.activation_range_momentum))
         table.add_row("")
@@ -120,6 +122,12 @@ def _quantization_formats(config: AppConfig) -> tuple[str, str]:
         return "INT8 (first/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), FP4 E2M1 (signed attention), shared INT4 (residual), INT8 (average pool)"
     if config.model.name == "basic_vit_int4":
         return "INT8 (first/classifier), INT4 (body)", "INT4 (body and shared residual), INT8 (average pool)"
+    if config.model.name == "basic_vit_test1":
+        return "INT8 (first/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), FP4 E2M1 (signed attention), independent INT8 (residual), INT8 (average pool)"
+    if config.model.name == "basic_vit_test2":
+        return "INT8 (first/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), INT8 (Q/K/V and attention map), FP4 E2M1 (attention output), shared INT4 (residual), INT8 (average pool)"
+    if config.model.name == "basic_vit_test3":
+        return "INT8 (first/classifier), FP4 E2M1 (body)", "UFP4 E2M2 (after ReLU), INT8 (Q/K/V and attention map), FP4 E2M1 (attention output), independent INT8 (residual), INT8 (average pool)"
     if config.model.name in {"resnet18_fp4", "mobilenet_v2_fp4"}:
         return "INT8 (stem/classifier), FP4 E2M1 (body)", "FP4 E2M1 (body), UINT8 (average pool)"
     if config.model.name in {"resnet18_ufp4", "mobilenet_v2_ufp4"}:
