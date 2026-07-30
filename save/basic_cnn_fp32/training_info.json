@@ -1,0 +1,12 @@
+{
+  "device": "cuda",
+  "pytorch_version": "2.13.0+cu130",
+  "model_name": "cnn",
+  "parameter_count": 70938,
+  "load_weight": false,
+  "weight_path": "",
+  "macs": "3,520,512 (3.52M)",
+  "image_size": 32,
+  "normalization": "zero_one",
+  "quantization": null
+}
