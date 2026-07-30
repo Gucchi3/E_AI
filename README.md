@@ -40,6 +40,8 @@ python main.py --config config/MobileNet_v2/mobilenet_v2_fp4.json
 python main.py --config config/MobileNet_v2/mobilenet_v2_ufp4.json
 ```
 
+`int4_cnn`は、最初の畳み込みと最後の分類層をINT8、中間層の重みをsigned INT4、ReLU後の活性化をzero-point 0のUINT4として実装しています。分類層へ入る直前だけUINT8へ戻します。
+
 `resnet18_fp32`は3×3・stride 1のstemとmax poolingなしで32×32入力へ適応したResNet-18、`mobilenet_v2_fp32`はstemのstrideだけを1へ変更したCIFAR-10向けMobileNetV2です。既存のCNN系モデルは`model/basic_cnn/`、ResNet-18は`model/ResNet18/`、MobileNetV2は`model/MobileNet_v2/`に整理しています。
 
 モデル名と実装ファイル、設定ファイルは`cnn`、`int8_cnn`、`int4_cnn`、`fp4_cnn`、`mixed_cnn`、`test_cnn`、`ufp4_test_cnn`で統一しています。
@@ -102,7 +104,7 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 - `test_cnn`: 先頭と末尾をINT8、中間をUINT4活性×FP4 E2M1重みで量子化
 - `ufp4_test_cnn`: 先頭と末尾をINT8、中間をUFP4 E2M2活性×FP4 E2M1重みで量子化
 
-BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`basic_vit_fp4`、`basic_vit_ufp4`の順で基本モデルを並べ、追加実験を`basic_vit_test1`～`basic_vit_test7`として管理します。
+BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`basic_vit_fp4`、`basic_vit_ufp4`の順で基本モデルを並べ、追加実験を`basic_vit_test1`～`basic_vit_test8`として管理します。
 
 | モデル名 | 本体 | Attention | 残差 |
 | --- | --- | --- | --- |
@@ -113,6 +115,9 @@ BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`ba
 | `basic_vit_test5` | FP4重み、ReLU後UFP4 | FP4 | 共有scale INT8 |
 | `basic_vit_test6` | INT4重み、signed INT4活性 | signed INT4 | 共有scale INT8 |
 | `basic_vit_test7` | INT4重み、ReLU後UINT4 | signed INT4 | 共有scale INT8 |
+| `basic_vit_test8` | FP4重み、ReLU後UINT4 | FP4 | 共有scale INT8 |
+
+`basic_vit_test8`は`basic_vit_test5`と同じFP4重み・FP4 Attention・共有scale INT8残差を維持し、ReLU6後のUFP4 E2M2だけを一様UINT4へ置き換えた比較モデルです。
 
 UFP4系モデルのAttention×VはINT32で積和累積し、中間FP4へ再量子化せず、INT32 accumulatorから直接ReLU6を通してUFP4へ再量子化します。test2とtest3のQKV Convは、残差出力をFP4へ変換せず、そのINT4またはINT8活性をFP4重みと直接演算します。
 
