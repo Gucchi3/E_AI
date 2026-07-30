@@ -104,7 +104,7 @@ raw `state_dict`、`model`キーを持つcheckpoint、`state_dict`キーを持�
 - `test_cnn`: 先頭と末尾をINT8、中間をUINT4活性×FP4 E2M1重みで量子化
 - `ufp4_test_cnn`: 先頭と末尾をINT8、中間をUFP4 E2M2活性×FP4 E2M1重みで量子化
 
-BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`basic_vit_fp4`、`basic_vit_ufp4`の順で基本モデルを並べ、追加実験を`basic_vit_test1`～`basic_vit_test8`として管理します。
+BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`basic_vit_fp4`、`basic_vit_ufp4`の順で基本モデルを並べ、追加実験を`basic_vit_test1`～`basic_vit_test9`として管理します。
 
 | モデル名 | 本体 | Attention | 残差 |
 | --- | --- | --- | --- |
@@ -116,8 +116,10 @@ BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`ba
 | `basic_vit_test6` | INT4重み、signed INT4活性 | signed INT4 | 共有scale INT8 |
 | `basic_vit_test7` | INT4重み、ReLU後UINT4 | signed INT4 | 共有scale INT8 |
 | `basic_vit_test8` | FP4重み、ReLU後UINT4 | FP4 | 共有scale INT8 |
+| `basic_vit_test9` | FP4重み、ReLU後UFP4 | FP4 | 共有scale INT4 |
 
 `basic_vit_test8`は`basic_vit_test5`と同じFP4重み・FP4 Attention・共有scale INT8残差を維持し、ReLU6後のUFP4 E2M2だけを一様UINT4へ置き換えた比較モデルです。
+`basic_vit_test9`は`basic_vit_test5`と同じFP4重み・UFP4 E2M2活性化・FP4 Attentionを維持し、共有残差だけをINT8からINT4へ変更した比較モデルです。機能的には`basic_vit_ufp4`と同じ条件です。
 
 UFP4系モデルのAttention×VはINT32で積和累積し、中間FP4へ再量子化せず、INT32 accumulatorから直接ReLU6を通してUFP4へ再量子化します。test2とtest3のQKV Convは、残差出力をFP4へ変換せず、そのINT4またはINT8活性をFP4重みと直接演算します。
 
