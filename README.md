@@ -114,6 +114,10 @@ BasicViTは、`basic_vit_fp32`の後に`basic_vit_int8`、`basic_vit_int4`、`ba
 | `basic_vit_test6` | INT4重み、signed INT4活性 | signed INT4 | 共有scale INT8 |
 | `basic_vit_test7` | INT4重み、ReLU後UINT4 | signed INT4 | 共有scale INT8 |
 
+UFP4系モデルのAttention×VはINT32で積和累積し、中間FP4へ再量子化せず、INT32 accumulatorから直接ReLU6を通してUFP4へ再量子化します。test2とtest3のQKV Convは、残差出力をFP4へ変換せず、そのINT4またはINT8活性をFP4重みと直接演算します。
+
+独立scale残差のtest1、test3、test4では、FFNまたはAttentionの最終Projection Convが持つ出力チャンネル別INT32 accumulator scaleから、その残差加算専用のINT8またはINT4出力scaleへ直接再量子化します。本線専用の中間INT8/INT4量子化は挟みません。
+
 すべてのConvは3×3です。平均プーリングは使用せず、32×32入力をstride 2のConvで`32→16→8→4`へ縮小し、`64×4×4`をFlattenして線形層へ入力します。
 
 活性scaleは学習中に`0.95 × previous + 0.05 × current`で更新し、評価時は固定します。scaleと整数biasは重みと同じ`state_dict`へ保存されます。最終Linearはクラスごとのaccumulator scaleを維持し、共通出力scaleへの変換は行いません。

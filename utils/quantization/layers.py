@@ -43,6 +43,14 @@ class QuantConv2d(nn.Conv2d):
         return self.weight_quantizer.scale
 
 
+    @property
+    def accumulator_scale(self) -> torch.Tensor:
+        """入力と重みの積に対応する出力チャンネル単位のINT32 accumulator scaleを返す。"""
+        if self.bias_scale is None:
+            raise RuntimeError("QuantConv2d accumulator scale is unavailable when bias=False.")
+        return self.bias_scale
+
+
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor | None = None) -> torch.Tensor:
         """Fake Quantizationした重みとbiasで畳み込みを行う。"""
         quantized_weight = self.weight_quantizer(self.weight)

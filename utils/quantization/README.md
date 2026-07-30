@@ -79,6 +79,16 @@ test_activation = activation_quantizer(test_activation)
 
 学習時のFP32 master weightと損失計算は勾配更新のために残します。PyTorchの`conv2d`と`linear`へ渡すのは、選択した形式へ量子化してからdequantizeした浮動小数点Tensorです。量子化codeを直接ConvやLinearへ渡しません。最終Linearはクラス別scaleのまま実数logitを返し、共通scale化は実機argmaxの仕様を決めるまで行いません。
 
+独立scale残差では、最終Projection Convの出力を中間INT8/INT4へ量子化しません。`QuantConv2d.accumulator_scale`が返す出力チャンネル別INT32 accumulator scaleを`QuantResidualAdd`へ渡し、各残差加算が持つ1個の出力scaleへ直接再量子化してから残差を加算します。
+
+```text
+Projection INT32 accumulator
+    ├─ channel別 accumulator scale ─┐
+    │                               ├─ 残差加算専用scaleへ直接変換 ─┐
+INT8/INT4 identity + identity scale ┘                               ├─ 加算・飽和
+                                                                    └─ INT8/INT4出力
+```
+
 ## 学習後の固定小数点変換
 
 `FixedPointRequantizer`と`fixed_point_parameters()`は、学習後に入力scaleと出力scaleの比率をPULP式のmultiplierと右shiftへ変換するための部品です。現在のQATモデルのforwardには接続しません。
@@ -121,6 +131,7 @@ input_quantizer = IntegerQuantizer(bit_width=8, signed=False, fixed_scale=1.0 / 
 | BatchNorm fold | 実装済み | FP32保存時にPyTorch公式機能でConvへ吸収 |
 | fold後biasのint32量子化 | 実装済み | `input_scale * weight_scale`を使用 |
 | Linear biasのint32量子化 | 実装済み | 整数値とscaleをstate_dictへ保存 |
+| 独立残差への直接requantization | 実装済み | Projectionのchannel別INT32 accumulatorから加算専用scaleへ1回で変換 |
 | PULP式整数requantization | 変換部品のみ | QAT後の変換で使用する |
 | Linear出力scaleの共通化 | 保留 | 実機argmaxの比較方式を決めてから実装 |
 | 重み・scaleのC配列export | 保留 | 推論レイアウト確定後に追加 |

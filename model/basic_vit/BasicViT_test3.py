@@ -7,7 +7,7 @@ import math
 import torch
 from torch import nn
 
-from utils.quantization import FP4Quantizer, IntegerQuantizer, PerTokenNEQ, QuantConv2d, QuantLinear, QuantMatMul, QuantResidualAdd, QuantizedAvgPool2d, UFP4Quantizer
+from utils.quantization import IntegerQuantizer, PerTokenNEQ, QuantConv2d, QuantLinear, QuantMatMul, QuantResidualAdd, QuantizedAvgPool2d, UFP4Quantizer
 
 
 class Test3BasicViTStem(nn.Module):
@@ -63,14 +63,13 @@ class Test3ConvolutionalFeedForward(nn.Module):
         self.depthwise_relu      = nn.ReLU6(inplace=False)
         self.depthwise_quantizer = UFP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.project_conv      = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
-        self.project_bn        = nn.Identity()
-        self.project_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.project_conv = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
+        self.project_bn   = nn.Identity()
 
     @property
     def output_scale(self) -> torch.Tensor:
-        """残差加算へ渡す主枝のINT8 scaleを返す。"""
-        return self.project_quantizer.scale
+        """残差加算へ渡すProjection ConvのINT32 accumulator scaleを返す。"""
+        return self.project_conv.accumulator_scale
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
         value = self.expand_conv(value, input_scale / 2.0)
@@ -85,7 +84,6 @@ class Test3ConvolutionalFeedForward(nn.Module):
 
         value = self.project_conv(value, self.depthwise_quantizer.scale / 8.0)
         value = self.project_bn(value)
-        value = self.project_quantizer(value)
         return value
 
 
@@ -110,7 +108,7 @@ class Test3LocalFeedForwardBlock(nn.Module):
 
 
 class Test3SimpleAttention(nn.Module):
-    """FP4重みでQKVを生成し、QK・Attention map・VをINT8で計算する。"""
+    """独立INT8残差を直接入力し、FP4重みでQKVを生成してAttention内部をINT8で計算する。"""
 
     def __init__(self, channels: int, num_heads: int, key_dim: int, value_dim: int, rounding: str, activation_range_momentum: float) -> None:
         super().__init__()
@@ -125,8 +123,6 @@ class Test3SimpleAttention(nn.Module):
         query_key_channels = num_heads * key_dim
         value_channels     = num_heads * value_dim
 
-        self.attention_input_quantizer = FP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
-
         self.query_conv = QuantConv2d(channels, query_key_channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
         self.query_bn   = nn.Identity()
         self.query_neq  = PerTokenNEQ(bit_width=8, rounding=rounding)
@@ -139,35 +135,31 @@ class Test3SimpleAttention(nn.Module):
         self.value_bn        = nn.Identity()
         self.value_quantizer = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.query_key_matmul           = QuantMatMul(bit_width=8, rounding=rounding)
-        self.attention_quantizer        = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
-        self.attention_value_matmul     = QuantMatMul(bit_width=8, rounding=rounding)
-        self.attention_output_quantizer = FP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
+        self.query_key_matmul       = QuantMatMul(bit_width=8, rounding=rounding)
+        self.attention_quantizer    = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.attention_value_matmul = QuantMatMul(bit_width=8, rounding=rounding)
 
         self.project_input_relu      = nn.ReLU6(inplace=False)
         self.project_input_quantizer = UFP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
-        self.project_conv            = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
-        self.project_bn              = nn.Identity()
-        self.project_quantizer       = IntegerQuantizer(bit_width=8, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.project_conv = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
+        self.project_bn   = nn.Identity()
 
     @property
     def output_scale(self) -> torch.Tensor:
-        """Attention主枝のprojection後に得られるINT8 scaleを返す。"""
-        return self.project_quantizer.scale
+        """残差加算へ渡すProjection ConvのINT32 accumulator scaleを返す。"""
+        return self.project_conv.accumulator_scale
 
-    def forward(self, value: torch.Tensor) -> torch.Tensor:
+    def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
         batch_size, _, height, width = value.shape
         token_count                  = height * width
 
-        attention_input = self.attention_input_quantizer(value)
-
-        query = self.query_conv(attention_input, self.attention_input_quantizer.scale / 4.0)
+        query = self.query_conv(value, input_scale / 2.0)
         query = self.query_bn(query)
         query = query.reshape(batch_size, self.num_heads, self.key_dim, token_count)
         query = query.permute(0, 1, 3, 2)
         query, query_scale = self.query_neq(query)
 
-        key = self.key_conv(attention_input, self.attention_input_quantizer.scale / 4.0)
+        key = self.key_conv(value, input_scale / 2.0)
         key = self.key_bn(key)
         key = key.reshape(batch_size, self.num_heads, self.key_dim, token_count)
         key = key.permute(0, 1, 3, 2)
@@ -179,21 +171,19 @@ class Test3SimpleAttention(nn.Module):
         attention    = attention * self.attention_scale
         attention    = self.attention_quantizer(attention)
 
-        attention_value = self.value_conv(attention_input, self.attention_input_quantizer.scale / 4.0)
+        attention_value = self.value_conv(value, input_scale / 2.0)
         attention_value = self.value_bn(attention_value)
         attention_value = self.value_quantizer(attention_value)
         attention_value = attention_value.reshape(batch_size, self.num_heads, self.value_dim, token_count)
         attention_value = attention_value.permute(0, 1, 3, 2)
 
         output, _ = self.attention_value_matmul(attention, self.attention_quantizer.scale, attention_value, self.value_quantizer.scale)
-        output    = self.attention_output_quantizer(output)
         output    = output.permute(0, 1, 3, 2)
         output    = output.reshape(batch_size, self.num_heads * self.value_dim, height, width)
         output    = self.project_input_relu(output)
         output    = self.project_input_quantizer(output)
         output    = self.project_conv(output, self.project_input_quantizer.scale / 8.0)
         output    = self.project_bn(output)
-        output    = self.project_quantizer(output)
         return output
 
 
@@ -214,7 +204,7 @@ class Test3AttentionFeedForwardBlock(nn.Module):
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
         identity         = value
-        attention_output = self.attention(value)
+        attention_output = self.attention(value, input_scale)
         value, _         = self.attention_residual_add(attention_output, self.attention.output_scale, identity, input_scale)
 
         identity   = value

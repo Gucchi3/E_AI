@@ -63,14 +63,13 @@ class Test4ConvolutionalFeedForward(nn.Module):
         self.depthwise_relu      = nn.ReLU6(inplace=False)
         self.depthwise_quantizer = UFP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
 
-        self.project_conv      = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
-        self.project_bn        = nn.Identity()
-        self.project_quantizer = IntegerQuantizer(bit_width=4, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.project_conv = QuantConv2d(hidden_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
+        self.project_bn   = nn.Identity()
 
     @property
     def output_scale(self) -> torch.Tensor:
-        """残差加算へ渡す主枝のINT4 scaleを返す。"""
-        return self.project_quantizer.scale
+        """残差加算へ渡すProjection ConvのINT32 accumulator scaleを返す。"""
+        return self.project_conv.accumulator_scale
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
         value = self.expand_conv(value, input_scale / 2.0)
@@ -85,7 +84,6 @@ class Test4ConvolutionalFeedForward(nn.Module):
 
         value = self.project_conv(value, self.depthwise_quantizer.scale / 8.0)
         value = self.project_bn(value)
-        value = self.project_quantizer(value)
         return value
 
 
@@ -143,14 +141,13 @@ class Test4SimpleAttention(nn.Module):
 
         self.project_input_relu      = nn.ReLU6(inplace=False)
         self.project_input_quantizer = UFP4Quantizer(rounding=rounding, range_momentum=activation_range_momentum)
-        self.project_conv            = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
-        self.project_bn              = nn.Identity()
-        self.project_quantizer       = IntegerQuantizer(bit_width=4, signed=True, rounding=rounding, range_momentum=activation_range_momentum)
+        self.project_conv = QuantConv2d(value_channels, channels, kernel_size=1, stride=1, padding=0, bias=True, weight_bits=4, rounding=rounding, quantizer="fp4")
+        self.project_bn   = nn.Identity()
 
     @property
     def output_scale(self) -> torch.Tensor:
-        """Attention主枝のprojection後に得られるINT4 scaleを返す。"""
-        return self.project_quantizer.scale
+        """残差加算へ渡すProjection ConvのINT32 accumulator scaleを返す。"""
+        return self.project_conv.accumulator_scale
 
     def forward(self, value: torch.Tensor, input_scale: torch.Tensor) -> torch.Tensor:
         batch_size, _, height, width = value.shape
@@ -187,7 +184,6 @@ class Test4SimpleAttention(nn.Module):
         output    = self.project_input_quantizer(output)
         output    = self.project_conv(output, self.project_input_quantizer.scale / 8.0)
         output    = self.project_bn(output)
-        output    = self.project_quantizer(output)
         return output
 
 
